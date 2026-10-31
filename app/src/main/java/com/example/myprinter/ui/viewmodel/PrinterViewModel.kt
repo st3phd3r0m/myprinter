@@ -1,7 +1,6 @@
 package com.example.myprinter.ui.viewmodel
 
 import android.app.Application
-import android.graphics.Bitmap
 import android.hardware.usb.UsbDevice
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -47,9 +46,9 @@ class PrinterViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    suspend fun printBitmap(bitmap: Bitmap): Boolean {
+    suspend fun printDocument(uri: Uri): Boolean {
         return withContext(Dispatchers.IO) {
-            usbPrinterManager.printBitmap(bitmap)
+            usbPrinterManager.printDocument(uri)
         }
     }
 

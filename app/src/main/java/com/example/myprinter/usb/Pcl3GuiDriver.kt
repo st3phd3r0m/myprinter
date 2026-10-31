@@ -31,34 +31,51 @@
 package com.example.myprinter.usb
 
 import android.graphics.Bitmap
-import java.io.ByteArrayOutputStream
+import java.io.OutputStream
+
+/** One page of ARGB pixels, supplied row by row. */
+internal class PageImage(val width: Int, val height: Int, val readRow: (y: Int, row: IntArray) -> Unit)
 
 /**
  * PCL3GUI driver for the HP Deskjet 1510, mirroring what HPLIP's hpcups filter sends
  * for this model (tech-class "Pyramid", encapsulation Pcl3Gui2 in prnt/hpcups/Pcl3Gui2.cpp):
  * 24-bit RGB rows compressed with Mode 10, A4 plain paper, "Normal" quality (600x300 dpi).
  *
- * Validated against a reference stream produced on Linux by
+ * Validated against reference streams produced on Linux by
  * `cupsfilter -p Deskjet-1510-series.ppd -m printer/foo`.
  */
 class Pcl3GuiDriver {
 
-    fun generatePclData(bitmap: Bitmap): ByteArray {
-        val pixels = IntArray(bitmap.width)
-        return encodePage(bitmap.width, bitmap.height) { y, row ->
-            bitmap.getPixels(pixels, 0, bitmap.width, 0, y, bitmap.width, 1)
-            pixels.copyInto(row)
+    /**
+     * Writes a print job of [pageCount] pages to [out]. Pages are rendered one at a time by
+     * [renderPage], so only one page bitmap needs to be in memory; the caller owns the bitmaps.
+     */
+    fun writeJob(out: OutputStream, pageCount: Int, renderPage: (index: Int) -> Bitmap) {
+        writePages(out, pageCount) { index ->
+            val bitmap = renderPage(index)
+            PageImage(bitmap.width, bitmap.height) { y, row ->
+                bitmap.getPixels(row, 0, bitmap.width, 0, y, bitmap.width, 1)
+            }
         }
     }
 
-    /**
-     * Encodes one page. The image ([imageWidth] x [imageHeight], ARGB pixels supplied row by row
-     * through [readRow]) is scaled to fit the printable area, keeping its aspect ratio, and
-     * centred horizontally at the top of the page.
-     */
-    internal fun encodePage(imageWidth: Int, imageHeight: Int, readRow: (y: Int, row: IntArray) -> Unit): ByteArray {
-        val out = ByteArrayOutputStream()
+    /** hpcups sends the job header once, then the same page header before every page. */
+    internal fun writePages(out: OutputStream, pageCount: Int, page: (index: Int) -> PageImage) {
+        require(pageCount > 0)
         writeJobHeader(out)
+        for (index in 0 until pageCount) {
+            writePage(out, page(index))
+        }
+        out.write(RESET)
+        out.write(UEL)
+    }
+
+    /**
+     * The image is scaled to fit the printable area, keeping its aspect ratio, and centred
+     * horizontally at the top of the page.
+     */
+    private fun writePage(out: OutputStream, image: PageImage) {
+        val (imageWidth, imageHeight) = image.width to image.height
         writePageHeader(out)
 
         // Fit in inches, then convert to device pixels (horizontal and vertical dpi differ).
@@ -81,7 +98,7 @@ class Pcl3GuiDriver {
             if (y < dstHeight) {
                 val sy = (y.toLong() * imageHeight / dstHeight).toInt()
                 if (sy != sourceY) {
-                    readRow(sy, source)
+                    image.readRow(sy, source)
                     sourceY = sy
                 }
                 for (x in 0 until dstWidth) {
@@ -108,12 +125,9 @@ class Pcl3GuiDriver {
         // Trailing blank rows are not sent, as in hpcups.
 
         out.write(byteArrayOf(ESC, '*'.code.toByte(), 'r'.code.toByte(), 'C'.code.toByte(), 0x0C)) // end raster, form feed
-        out.write(RESET)
-        out.write(UEL)
-        return out.toByteArray()
     }
 
-    private fun writeJobHeader(out: ByteArrayOutputStream) {
+    private fun writeJobHeader(out: OutputStream) {
         out.write(RESET)
         out.write(UEL)
         out.write(
@@ -124,7 +138,7 @@ class Pcl3GuiDriver {
         )
     }
 
-    private fun writePageHeader(out: ByteArrayOutputStream) {
+    private fun writePageHeader(out: OutputStream) {
         // Media source (7 = auto), media type (0 = plain), page size (26 = A4), print quality (0 = normal)
         out.write("\u001B&l7H\u001B&l0M\u001B&l26A\u001B*o0M".toByteArray())
         // Media subtype: Esc*o5W 0D 03 00 + 16-bit subtype (0)

@@ -1,9 +1,6 @@
 package com.example.myprinter.ui.screens
 
-import android.graphics.ImageDecoder
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,8 +26,6 @@ import com.example.myprinter.ui.viewmodel.PrintJobStatus
 import com.example.myprinter.ui.viewmodel.PrintJobViewModel
 import com.example.myprinter.ui.viewmodel.PrintSettings
 import com.example.myprinter.ui.viewmodel.PrinterViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -44,7 +38,6 @@ fun PrintPreviewScreen(
     val settings by viewModel.currentSettings.collectAsState()
     val printJobs by viewModel.printJobs.collectAsState()
     val selectedUri by viewModel.selectedUri.collectAsState()
-    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -70,25 +63,7 @@ fun PrintPreviewScreen(
                     onPrint = { 
                         selectedUri?.let { uri ->
                             viewModel.startPrintJob(uri.lastPathSegment ?: "Document") {
-                                withContext(Dispatchers.IO) {
-                                    val bitmap = try {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                                            val source = ImageDecoder.createSource(context.contentResolver, uri)
-                                            ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
-                                                decoder.isMutableRequired = true
-                                            }
-                                        } else {
-                                            @Suppress("DEPRECATION")
-                                            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
-                                        }
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-                                    
-                                    bitmap?.let {
-                                        printerViewModel.printBitmap(it)
-                                    } ?: false
-                                }
+                                printerViewModel.printDocument(uri)
                             }
                         }
                     }

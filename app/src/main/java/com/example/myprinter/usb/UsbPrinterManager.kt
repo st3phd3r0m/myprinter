@@ -5,14 +5,17 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Bitmap
 import android.hardware.usb.*
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.BufferedOutputStream
+import java.io.IOException
+import java.io.OutputStream
 
 sealed class PrinterConnectionState {
     data object Idle : PrinterConnectionState()
@@ -250,34 +253,66 @@ class UsbPrinterManager(private val context: Context) {
         return "No status response"
     }
 
-    fun printBitmap(bitmap: Bitmap): Boolean {
-        addLog("Processing Bitmap ${bitmap.width}x${bitmap.height}")
-        return printRaw(Pcl3GuiDriver().generatePclData(bitmap))
+    /** Prints an image or a PDF, rendering and sending one page at a time. */
+    fun printDocument(uri: Uri): Boolean {
+        if (usbConnection == null) {
+            addLog("Cannot print: no printer connected")
+            return false
+        }
+        return try {
+            PrintDocument.open(context, uri).use { document ->
+                addLog("Printing ${document.pageCount} page(s)")
+                send { out ->
+                    Pcl3GuiDriver().writeJob(out, document.pageCount) { index ->
+                        addLog("Rendering page ${index + 1}/${document.pageCount}")
+                        document.renderPage(index)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            addLog("Cannot print document: ${e.message}")
+            false
+        }
     }
 
-    /**
-     * Sends ready-made printer data (e.g. a PCL file produced by hpcups on a PC) as is.
-     * USB bulk transfers are flow-controlled by the printer, so no throttling is needed.
-     */
-    fun printRaw(data: ByteArray): Boolean {
+    /** Sends ready-made printer data (e.g. a PCL file produced by hpcups on a PC) as is. */
+    fun printRaw(data: ByteArray): Boolean = send { it.write(data) }
+
+    private fun send(write: (OutputStream) -> Unit): Boolean {
         val conn = usbConnection ?: return false
         val epOut = endpointOut ?: return false
-        addLog("Sending ${data.size} bytes...")
+        val usbOut = UsbBulkOutputStream(conn, epOut)
+        return try {
+            synchronized(conn) {
+                BufferedOutputStream(usbOut, CHUNK_SIZE).use(write)
+            }
+            addLog("Sent ${usbOut.sent} bytes.")
+            true
+        } catch (e: IOException) {
+            addLog("Error: ${e.message}")
+            false
+        }
+    }
 
-        synchronized(conn) {
-            var sent = 0
-            while (sent < data.size) {
-                val len = minOf(CHUNK_SIZE, data.size - sent)
-                val result = conn.bulkTransfer(epOut, data, sent, len, TRANSFER_TIMEOUT_MS)
-                if (result < 0) {
-                    addLog("Error: Transfer failed at $sent bytes")
-                    return false
-                }
+    /** USB bulk transfers are flow-controlled by the printer, so no throttling is needed. */
+    private class UsbBulkOutputStream(
+        private val conn: UsbDeviceConnection,
+        private val endpoint: UsbEndpoint
+    ) : OutputStream() {
+        var sent = 0L
+            private set
+
+        override fun write(b: Int) = write(byteArrayOf(b.toByte()), 0, 1)
+
+        override fun write(b: ByteArray, off: Int, len: Int) {
+            var done = 0
+            while (done < len) {
+                val result = conn.bulkTransfer(endpoint, b, off + done, minOf(CHUNK_SIZE, len - done), TRANSFER_TIMEOUT_MS)
+                if (result < 0) throw IOException("Transfer failed at $sent bytes")
+                done += result
                 sent += result
             }
         }
-        addLog("Sent ${data.size} bytes.")
-        return true
     }
 
     fun disconnect() {

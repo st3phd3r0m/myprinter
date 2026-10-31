@@ -4,6 +4,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.random.Random
 
@@ -38,15 +39,23 @@ class Pcl3GuiDriverTest {
 
     @Test
     fun pageHeader_matchesHpcupsReference() {
-        val page = Pcl3GuiDriver().encodePage(10, 10) { _, row -> row.fill(0xFF000000.toInt()) }
+        val page = encode(blackPage)
         val start = page.indexOf("@PJL ENTER LANGUAGE=PCL3GUI\n".toByteArray()) + 28
-        // Bytes captured from hpcups output for the Deskjet 1510 (A4, plain, normal, colour).
-        val expected = "1b266c37481b266c304d1b266c3236411b2a6f304d1b2a6f3557" +
-            "0d030000001b2a67313257060700010258012c0a0120011b2675333030441b2a74333030521b2a72343831305" +
-            "31b266c2d32481b2a7231411b2a702d3259"
-        val header = page.copyOfRange(start, start + expected.length / 2)
-        assertEquals(expected, header.joinToString("") { "%02x".format(it) })
-        assertTrue(page.endsWith(byteArrayOf(0x1B, '*'.code.toByte(), 'r'.code.toByte(), 'C'.code.toByte(), 0x0C, 0x1B, 'E'.code.toByte()) + "\u001B%-12345X".toByteArray()))
+        val header = page.copyOfRange(start, start + PAGE_HEADER_HEX.length / 2)
+        assertEquals(PAGE_HEADER_HEX, header.joinToString("") { "%02x".format(it) })
+        assertTrue(page.endsWith(PAGE_END + JOB_END))
+    }
+
+    @Test
+    fun multiPageJob_matchesHpcupsStructure() {
+        // hpcups (3-page reference): one job header, then the same page header and
+        // page end for every page, then Reset + UEL once.
+        val job = String(encode(blackPage, blackPage, blackPage), Charsets.ISO_8859_1)
+        val pageHeader = String(PAGE_HEADER_HEX.chunked(2).map { it.toInt(16).toByte() }.toByteArray(), Charsets.ISO_8859_1)
+        assertEquals(1, job.windowed(27).count { it == "@PJL ENTER LANGUAGE=PCL3GUI" })
+        assertEquals(3, job.split(pageHeader).size - 1)
+        assertEquals(3, job.split(String(PAGE_END, Charsets.ISO_8859_1)).size - 1)
+        assertTrue(job.endsWith(String(PAGE_END + JOB_END, Charsets.ISO_8859_1)))
     }
 
     @Test
@@ -54,7 +63,7 @@ class Pcl3GuiDriverTest {
         // A 4:3 image: black frame, red/green/blue squares, grey gradient band.
         val w = 400
         val h = 300
-        val page = Pcl3GuiDriver().encodePage(w, h) { y, row ->
+        val page = encode(PageImage(w, h) { y, row ->
             for (x in 0 until w) {
                 row[x] = when {
                     x < 8 || y < 8 || x >= w - 8 || y >= h - 8 -> 0xFF000000.toInt()
@@ -65,7 +74,7 @@ class Pcl3GuiDriverTest {
                     else -> 0x00000000 // transparent: printed as white paper
                 }
             }
-        }
+        })
         File("build/test-output").mkdirs()
         File("build/test-output/sample_page.pcl").writeBytes(page)
 
@@ -77,11 +86,26 @@ class Pcl3GuiDriverTest {
         assertEquals(0xFF0000 and Mode10Compressor.WHITE, rows[300][1200])
     }
 
+    private val blackPage = PageImage(10, 10) { _, row -> row.fill(0xFF000000.toInt()) }
+
+    private fun encode(vararg pages: PageImage): ByteArray =
+        ByteArrayOutputStream().also { out -> Pcl3GuiDriver().writePages(out, pages.size) { pages[it] } }.toByteArray()
+
     private fun ByteArray.indexOf(needle: ByteArray): Int =
         (0..size - needle.size).first { i -> needle.indices.all { this[i + it] == needle[it] } }
 
     private fun ByteArray.endsWith(suffix: ByteArray): Boolean =
         size >= suffix.size && copyOfRange(size - suffix.size, size).contentEquals(suffix)
+
+    private companion object {
+        // Bytes captured from hpcups output for the Deskjet 1510 (A4, plain, normal, colour),
+        // from the page-size command to the top-margin command.
+        const val PAGE_HEADER_HEX = "1b266c37481b266c304d1b266c3236411b2a6f304d1b2a6f3557" +
+            "0d030000001b2a67313257060700010258012c0a0120011b2675333030441b2a74333030521b2a72343831305" +
+            "31b266c2d32481b2a7231411b2a702d3259"
+        val PAGE_END = byteArrayOf(0x1B, '*'.code.toByte(), 'r'.code.toByte(), 'C'.code.toByte(), 0x0C)
+        val JOB_END = byteArrayOf(0x1B, 'E'.code.toByte()) + "\u001B%-12345X".toByteArray()
+    }
 }
 
 /** Independent Mode 10 decoder, written from the format rather than from the encoder. */
