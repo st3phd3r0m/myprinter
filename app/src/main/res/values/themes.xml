@@ -1,0 +1,4 @@
+<resources>
+
+    <style name="Theme.MyPrinter" parent="Theme.MaterialComponents.Light" />
+</resources>

@@ -1,0 +1,38 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+/.idea/deviceManager.xml
+/.idea/deploymentTargetSelector.xml
+/.idea/copilotDiffState.xml
+/.idea/studiobot.xml
+/.idea/planningMode.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.kotlin
+
+# AI assistant exports and tooling (contain local paths, printer serial number, IP addresses)
+/ai
+/.agent
+
+# Python virtual environment
+/venv_printer
+__pycache__/
+
+# Local USB captures and diagnostics (contain user name, host name, serial number, local paths)
+*.bin
+/printer_diagnostics/*
+!/printer_diagnostics/test2_kotlin_driver_A4.pcl
+/tools
+/input_images
+
+deskjet_ep8_full.bin

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Printer Body -->
+    <path
+        android:fillColor="#00BCD4"
+        android:pathData="M24,44h60v24c0,2.2 -1.8,4 -4,4h-52c-2.2,0 -4,-1.8 -4,-4V44z" />
+    <!-- Paper Tray (Top) -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M34,24h40v20h-40z" />
+    <!-- Paper Output (Bottom) -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M30,68h48v10h-48z" />
+    <!-- Accent detail -->
+    <path
+        android:fillColor="#E91E63"
+        android:pathData="M70,50h8v4h-8z" />
+</vector>
