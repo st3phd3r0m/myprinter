@@ -30,8 +30,21 @@ class PrintJobViewModel : ViewModel() {
     private val _selectedUri = MutableStateFlow<Uri?>(null)
     val selectedUri: StateFlow<Uri?> = _selectedUri.asStateFlow()
 
+    // Set when another app shares or opens a file with this one; consumed by the navigation.
+    private val _openPrintScreen = MutableStateFlow(false)
+    val openPrintScreen: StateFlow<Boolean> = _openPrintScreen.asStateFlow()
+
     fun selectFile(uri: Uri?) {
         _selectedUri.value = uri
+    }
+
+    fun printFromOtherApp(uri: Uri) {
+        _selectedUri.value = uri
+        _openPrintScreen.value = true
+    }
+
+    fun onPrintScreenOpened() {
+        _openPrintScreen.value = false
     }
 
     fun updateSettings(settings: PrintOptions) {

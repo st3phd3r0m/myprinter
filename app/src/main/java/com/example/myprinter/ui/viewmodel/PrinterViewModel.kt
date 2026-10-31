@@ -4,10 +4,10 @@ import android.app.Application
 import android.hardware.usb.UsbDevice
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myprinter.MyPrinterApplication
 import com.example.myprinter.R
 import com.example.myprinter.usb.PrintOptions
 import com.example.myprinter.usb.PrinterConnectionState
-import com.example.myprinter.usb.UsbPrinterManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,8 +18,8 @@ import kotlinx.coroutines.withContext
 import android.net.Uri
 
 class PrinterViewModel(application: Application) : AndroidViewModel(application) {
-    private val usbPrinterManager = UsbPrinterManager(application)
-    
+    private val usbPrinterManager = (application as MyPrinterApplication).printerManager
+
     val connectionState: StateFlow<PrinterConnectionState> = usbPrinterManager.connectionState
 
     private val _discoveredPrinters = MutableStateFlow<List<UsbDevice>>(emptyList())
@@ -94,10 +94,5 @@ class PrinterViewModel(application: Application) : AndroidViewModel(application)
     fun disconnect() {
         usbPrinterManager.disconnect()
         _printerStatus.value = ""
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        usbPrinterManager.cleanup()
     }
 }

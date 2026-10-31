@@ -1,6 +1,9 @@
 package com.example.myprinter.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -28,6 +31,16 @@ fun AppNavigation() {
     val backStack = rememberNavBackStack(Route.FileSelection)
     val printerViewModel: PrinterViewModel = viewModel()
     val printJobViewModel: PrintJobViewModel = viewModel()
+
+    // A file shared from another app goes straight to the print screen, on top of the file screen.
+    val openPrintScreen by printJobViewModel.openPrintScreen.collectAsState()
+    LaunchedEffect(openPrintScreen) {
+        if (openPrintScreen) {
+            while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+            backStack.add(Route.PrintPreview)
+            printJobViewModel.onPrintScreenOpened()
+        }
+    }
 
     NavDisplay(
         backStack = backStack,

@@ -76,4 +76,8 @@
     <string name="logs_saved">Journal enregistré dans %1$s</string>
     <string name="logs_create_failed">Impossible de créer le fichier dans Téléchargements</string>
     <string name="logs_error">Erreur : %1$s</string>
+
+    <!-- Print service (system "Print" menu) -->
+    <string name="print_service_not_connected">Imprimante non connectée : branchez-la et ouvrez MyPrinter</string>
+    <string name="print_service_failed">Échec de l\'impression</string>
 </resources>

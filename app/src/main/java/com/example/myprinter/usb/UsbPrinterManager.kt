@@ -152,6 +152,22 @@ class UsbPrinterManager(private val context: Context) {
         requestPermission(device)
     }
 
+    /**
+     * For callers without a printer screen (the print service): connects to the saved printer,
+     * or else to the only printer plugged in. Returns false if USB permission still has to be
+     * granted; the request is then shown and the caller can retry.
+     */
+    fun ensureConnected(): Boolean {
+        if (usbConnection != null) return true
+        connectToSavedPrinter()
+        if (usbConnection == null && _connectionState.value !is PrinterConnectionState.RequestingPermission) {
+            discoverPrinters().singleOrNull()?.let { requestPermission(it) }
+        }
+        return usbConnection != null
+    }
+
+    fun isPrinterPlugged(): Boolean = usbConnection != null || discoverPrinters().isNotEmpty()
+
     fun requestPermission(device: UsbDevice) {
         if (usbConnection != null && device == usbDevice) {
             addLog("Already connected to ${device.deviceName}")
@@ -287,13 +303,25 @@ class UsbPrinterManager(private val context: Context) {
             return false
         }
         return try {
-            PrintDocument.open(context, uri).use { document ->
-                addLog("Printing ${document.pageCount} page(s), $options")
-                send { out ->
-                    Pcl3GuiDriver().writeJob(out, document.pageCount, options) { index ->
-                        addLog("Rendering page ${index + 1}/${document.pageCount}")
-                        document.renderPage(index)
-                    }
+            PrintDocument.open(context, uri).use { printDocument(it, options) }
+        } catch (e: Exception) {
+            addLog("Cannot print document: ${e.message}")
+            false
+        }
+    }
+
+    /** Prints an already opened document; the caller closes it. */
+    fun printDocument(document: PrintDocument, options: PrintOptions): Boolean {
+        if (usbConnection == null) {
+            addLog("Cannot print: no printer connected")
+            return false
+        }
+        return try {
+            addLog("Printing ${document.pageCount} page(s), $options")
+            send { out ->
+                Pcl3GuiDriver().writeJob(out, document.pageCount, options) { index ->
+                    addLog("Rendering page ${index + 1}/${document.pageCount}")
+                    document.renderPage(index)
                 }
             }
         } catch (e: Exception) {
@@ -356,12 +384,6 @@ class UsbPrinterManager(private val context: Context) {
         _connectionState.value = PrinterConnectionState.Disconnected
     }
 
-    fun cleanup() {
-        try {
-            context.unregisterReceiver(usbReceiver)
-        } catch (e: Exception) {}
-        disconnect()
-    }
 
     private companion object {
         const val KEY_VENDOR_ID = "vendor_id"

@@ -77,4 +77,9 @@
     <string name="logs_saved">Logs saved to %1$s</string>
     <string name="logs_create_failed">Failed to create the file in Downloads</string>
     <string name="logs_error">Error: %1$s</string>
+
+    <!-- Print service (system "Print" menu) -->
+    <string name="print_service_printer_name">HP Deskjet 1510 (USB)</string>
+    <string name="print_service_not_connected">Printer not connected: plug it in and open MyPrinter</string>
+    <string name="print_service_failed">Printing failed</string>
 </resources>

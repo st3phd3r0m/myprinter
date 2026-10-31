@@ -64,13 +64,7 @@ sealed class PrintDocument : Closeable {
         fun open(context: Context, uri: Uri): PrintDocument {
             val resolver = context.contentResolver
             if (isPdf(context, uri)) {
-                val fd = resolver.openFileDescriptor(uri, "r") ?: throw IOException("Cannot open $uri")
-                return try {
-                    Pdf(fd, PdfRenderer(fd))
-                } catch (e: Exception) {
-                    fd.close()
-                    throw e
-                }
+                return openPdf(resolver.openFileDescriptor(uri, "r") ?: throw IOException("Cannot open $uri"))
             }
             val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { decoder, _, _ ->
@@ -81,6 +75,14 @@ sealed class PrintDocument : Closeable {
                 MediaStore.Images.Media.getBitmap(resolver, uri)
             }
             return Image(bitmap)
+        }
+
+        /** Takes ownership of [fd], which must be seekable (a file, not a pipe). */
+        fun openPdf(fd: ParcelFileDescriptor): PrintDocument = try {
+            Pdf(fd, PdfRenderer(fd))
+        } catch (e: Exception) {
+            fd.close()
+            throw e
         }
     }
 }
