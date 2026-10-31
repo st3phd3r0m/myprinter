@@ -254,16 +254,16 @@ class UsbPrinterManager(private val context: Context) {
     }
 
     /** Prints an image or a PDF, rendering and sending one page at a time. */
-    fun printDocument(uri: Uri): Boolean {
+    fun printDocument(uri: Uri, options: PrintOptions): Boolean {
         if (usbConnection == null) {
             addLog("Cannot print: no printer connected")
             return false
         }
         return try {
             PrintDocument.open(context, uri).use { document ->
-                addLog("Printing ${document.pageCount} page(s)")
+                addLog("Printing ${document.pageCount} page(s), $options")
                 send { out ->
-                    Pcl3GuiDriver().writeJob(out, document.pageCount) { index ->
+                    Pcl3GuiDriver().writeJob(out, document.pageCount, options) { index ->
                         addLog("Rendering page ${index + 1}/${document.pageCount}")
                         document.renderPage(index)
                     }

@@ -63,7 +63,7 @@ fun PrintPreviewScreen(
                     onPrint = { 
                         selectedUri?.let { uri ->
                             viewModel.startPrintJob(uri.lastPathSegment ?: "Document") {
-                                printerViewModel.printDocument(uri)
+                                printerViewModel.printDocument(uri, settings)
                             }
                         }
                     }
@@ -140,7 +140,7 @@ fun PrintSettingsCard(
                     Icon(Icons.Rounded.Remove, contentDescription = null)
                 }
                 Text("${settings.copies}", fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
-                IconButton(onClick = { onSettingsChange(settings.copy(copies = settings.copies + 1)) }) {
+                IconButton(onClick = { if (settings.copies < 99) onSettingsChange(settings.copy(copies = settings.copies + 1)) }) {
                     Icon(Icons.Rounded.Add, contentDescription = null)
                 }
             }
@@ -162,6 +162,16 @@ fun PrintSettingsCard(
                     options = listOf("Color", "Monochrome"),
                     selectedOption = settings.colorMode,
                     onOptionSelected = { onSettingsChange(settings.copy(colorMode = it)) }
+                )
+            }
+
+            // Print quality
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Qualité :", modifier = Modifier.weight(1f))
+                SegmentedButton(
+                    options = listOf("Brouillon", "Normal", "Optimal"),
+                    selectedOption = settings.quality,
+                    onOptionSelected = { onSettingsChange(settings.copy(quality = it)) }
                 )
             }
         }

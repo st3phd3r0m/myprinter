@@ -59,6 +59,80 @@ class Pcl3GuiDriverTest {
     }
 
     @Test
+    fun grayscaleHeader_matchesHpcupsKGrayReference() {
+        val out = ByteArrayOutputStream()
+        Pcl3GuiDriver().writePages(out, 1, grayscale = true) { blackPage }
+        val page = out.toByteArray()
+        val start = page.indexOf("@PJL ENTER LANGUAGE=PCL3GUI\n".toByteArray()) + 28
+        // hpcups output with -o ColorModel=KGray ("Black Only Grayscale").
+        val expected = "1b266c37481b266c304d1b266c3236411b2a6f304d1b2a6f35570d030000001b2a67313257060700010258012c" +
+            "0a0120011b2a6f35570b010000021b2675333030441b2a74333030521b2a7234383130531b266c2d32481b2a7231411b2a702d3259"
+        assertEquals(expected, page.copyOfRange(start, start + expected.length / 2).joinToString("") { "%02x".format(it) })
+    }
+
+    @Test
+    fun qualityHeaders_matchHpcupsReferences() {
+        // hpcups output with -o OutputMode=Draft / Normal / Best.
+        val expected = mapOf(
+            PrintQuality.Draft to "1b266c37481b266c304d1b266c3236411b2a6f2d324d1b2a6f35570d030000001b2a6731325706070001012c012c" +
+                "0a0120011b2675333030441b2a74333030521b2a7232343035531b266c2d32481b2a7231411b2a702d3259",
+            PrintQuality.Normal to PAGE_HEADER_HEX,
+            PrintQuality.Best to "1b266c37481b266c304d1b266c3236411b2a6f314d1b2a6f35570d030000001b2a6731325706070001025802580a" +
+                "0120011b2675363030441b2a74363030521b2a7234383130531b266c2d32481b2a7231411b2a702d3359"
+        )
+        for ((quality, hex) in expected) {
+            val out = ByteArrayOutputStream()
+            Pcl3GuiDriver().writePages(out, 1, quality) { blackPage }
+            val page = out.toByteArray()
+            val start = page.indexOf("@PJL ENTER LANGUAGE=PCL3GUI\n".toByteArray()) + 28
+            assertEquals(quality.name, hex, page.copyOfRange(start, start + hex.length / 2).joinToString("") { "%02x".format(it) })
+
+            // The square image fills the printable width; its height in rows follows the vertical dpi.
+            val rows = Mode10Decoder.decodePage(page)
+            assertEquals(quality.printableWidth, rows.first().size)
+            val expectedRows = quality.printableWidth * quality.vDpi / quality.hDpi
+            assertTrue("${quality.name}: ${rows.size} rows", rows.size in expectedRows - 1..expectedRows)
+        }
+    }
+
+    @Test
+    fun landscape_rotatesPageCounterClockwise() {
+        // 400x200 landscape page: top half red, bottom half blue, black stripe on the left edge.
+        val page = FakePage(400, 200) { x, y ->
+            when {
+                x < 20 -> 0xFF000000.toInt()
+                y < 100 -> 0xFFFF0000.toInt()
+                else -> 0xFF0000FF.toInt()
+            }
+        }
+        val out = ByteArrayOutputStream()
+        Pcl3GuiDriver().writeLaidOutJob(out, 1, PrintOptions(landscape = true)) { page }
+        val rows = Mode10Decoder.decodePage(out.toByteArray())
+
+        // Rotated 200x400 page fills the printable height: 3316 x 3316 px, centred (left = 747).
+        // Counter-clockwise: the top of the page goes to the left, its left edge to the bottom.
+        val red = 0xFF0000 and Mode10Compressor.WHITE
+        val blue = 0x0000FF and Mode10Compressor.WHITE
+        assertEquals(red, rows[100][747 + 100])
+        assertEquals(blue, rows[100][747 + 3000])
+        assertEquals(0, rows[3300][747 + 1500])
+        assertEquals(Mode10Compressor.WHITE, rows[100][700]) // left margin
+    }
+
+    @Test
+    fun copies_repeatTheWholeDocument() {
+        val rendered = mutableListOf<Int>()
+        val out = ByteArrayOutputStream()
+        Pcl3GuiDriver().writeLaidOutJob(out, 2, PrintOptions(copies = 2)) { index ->
+            rendered += index
+            FakePage(10, 10) { _, _ -> 0xFF000000.toInt() }
+        }
+        assertEquals(listOf(0, 1, 0, 1), rendered)
+        val job = String(out.toByteArray(), Charsets.ISO_8859_1)
+        assertEquals(4, job.split(String(PAGE_END, Charsets.ISO_8859_1)).size - 1)
+    }
+
+    @Test
     fun encodePage_writesSamplePageForExternalCheck() {
         // A 4:3 image: black frame, red/green/blue squares, grey gradient band.
         val w = 400
@@ -79,7 +153,7 @@ class Pcl3GuiDriverTest {
         File("build/test-output/sample_page.pcl").writeBytes(page)
 
         val rows = Mode10Decoder.decodePage(page)
-        assertEquals(Pcl3GuiDriver.PRINTABLE_WIDTH, rows.first().size)
+        assertEquals(PrintQuality.Normal.printableWidth, rows.first().size)
         // The image is 4:3 and fits the page width: 4810 px at 600 dpi -> 1803 rows at 300 dpi.
         val left = rows[100].indexOfFirst { it == 0 }
         assertEquals(0, left)
@@ -105,6 +179,13 @@ class Pcl3GuiDriverTest {
             "31b266c2d32481b2a7231411b2a702d3259"
         val PAGE_END = byteArrayOf(0x1B, '*'.code.toByte(), 'r'.code.toByte(), 'C'.code.toByte(), 0x0C)
         val JOB_END = byteArrayOf(0x1B, 'E'.code.toByte()) + "\u001B%-12345X".toByteArray()
+    }
+}
+
+/** In-memory page following the [android.graphics.Bitmap.getPixels] contract. */
+private class FakePage(override val width: Int, override val height: Int, val pixel: (x: Int, y: Int) -> Int) : PagePixels {
+    override fun getPixels(pixels: IntArray, stride: Int, x: Int, y: Int, width: Int, height: Int) {
+        for (j in 0 until height) for (i in 0 until width) pixels[j * stride + i] = pixel(x + i, y + j)
     }
 }
 

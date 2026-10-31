@@ -22,7 +22,8 @@ data class PrintJob(
 data class PrintSettings(
     val copies: Int = 1,
     val orientation: String = "Portrait",
-    val colorMode: String = "Color"
+    val colorMode: String = "Color",
+    val quality: String = "Normal"
 )
 
 class PrintJobViewModel : ViewModel() {

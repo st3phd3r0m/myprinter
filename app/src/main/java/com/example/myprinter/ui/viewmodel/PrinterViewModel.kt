@@ -4,6 +4,8 @@ import android.app.Application
 import android.hardware.usb.UsbDevice
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myprinter.usb.PrintOptions
+import com.example.myprinter.usb.PrintQuality
 import com.example.myprinter.usb.PrinterConnectionState
 import com.example.myprinter.usb.UsbPrinterManager
 import kotlinx.coroutines.delay
@@ -46,9 +48,19 @@ class PrinterViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    suspend fun printDocument(uri: Uri): Boolean {
+    suspend fun printDocument(uri: Uri, settings: PrintSettings): Boolean {
+        val options = PrintOptions(
+            copies = settings.copies,
+            landscape = settings.orientation == "Landscape",
+            grayscale = settings.colorMode == "Monochrome",
+            quality = when (settings.quality) {
+                "Brouillon" -> PrintQuality.Draft
+                "Optimal" -> PrintQuality.Best
+                else -> PrintQuality.Normal
+            }
+        )
         return withContext(Dispatchers.IO) {
-            usbPrinterManager.printDocument(uri)
+            usbPrinterManager.printDocument(uri, options)
         }
     }
 

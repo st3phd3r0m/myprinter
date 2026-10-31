@@ -33,13 +33,51 @@ package com.example.myprinter.usb
 import android.graphics.Bitmap
 import java.io.OutputStream
 
+/** The part of [Bitmap] the driver reads (same contract as [Bitmap.getPixels], offset 0). */
+internal interface PagePixels {
+    val width: Int
+    val height: Int
+    fun getPixels(pixels: IntArray, stride: Int, x: Int, y: Int, width: Int, height: Int)
+}
+
 /** One page of ARGB pixels, supplied row by row. */
 internal class PageImage(val width: Int, val height: Int, val readRow: (y: Int, row: IntArray) -> Unit)
 
 /**
+ * The hpcups PPD print modes for plain paper, with the values hpcups derives from them.
+ * Printable area: A4 imageable area of the PPD (HWMargins 9 41.04 9 4.32 pt); the width is the
+ * value Ghostscript renders (cupsWidth), the height is rounded down slightly.
+ * Top margin: printable_start_y (4 pt) minus HPMechOffset (60/1000 in), at the vertical resolution.
+ */
+enum class PrintQuality(
+    internal val pclQuality: Int,
+    internal val hDpi: Int,
+    internal val vDpi: Int,
+    internal val printableWidth: Int,
+    internal val printableHeight: Int,
+    internal val topMargin: Int
+) {
+    Draft(-2, 300, 300, 2405, 3316, -2),
+    Normal(0, 600, 300, 4810, 3316, -2),
+    Best(1, 600, 600, 4810, 6632, -3)
+}
+
+/**
+ * @param copies the whole document is repeated (collated copies).
+ * @param landscape each page is rotated 90° counter-clockwise onto the portrait sheet.
+ * @param grayscale printed with black ink only (hpcups "Black Only Grayscale").
+ */
+data class PrintOptions(
+    val copies: Int = 1,
+    val landscape: Boolean = false,
+    val grayscale: Boolean = false,
+    val quality: PrintQuality = PrintQuality.Normal
+)
+
+/**
  * PCL3GUI driver for the HP Deskjet 1510, mirroring what HPLIP's hpcups filter sends
  * for this model (tech-class "Pyramid", encapsulation Pcl3Gui2 in prnt/hpcups/Pcl3Gui2.cpp):
- * 24-bit RGB rows compressed with Mode 10, A4 plain paper, "Normal" quality (600x300 dpi).
+ * 24-bit RGB rows compressed with Mode 10, A4 plain paper, in one of the [PrintQuality] modes.
  *
  * Validated against reference streams produced on Linux by
  * `cupsfilter -p Deskjet-1510-series.ppd -m printer/foo`.
@@ -50,21 +88,48 @@ class Pcl3GuiDriver {
      * Writes a print job of [pageCount] pages to [out]. Pages are rendered one at a time by
      * [renderPage], so only one page bitmap needs to be in memory; the caller owns the bitmaps.
      */
-    fun writeJob(out: OutputStream, pageCount: Int, renderPage: (index: Int) -> Bitmap) {
-        writePages(out, pageCount) { index ->
+    fun writeJob(out: OutputStream, pageCount: Int, options: PrintOptions, renderPage: (index: Int) -> Bitmap) {
+        writeLaidOutJob(out, pageCount, options) { index ->
             val bitmap = renderPage(index)
-            PageImage(bitmap.width, bitmap.height) { y, row ->
-                bitmap.getPixels(row, 0, bitmap.width, 0, y, bitmap.width, 1)
+            object : PagePixels {
+                override val width = bitmap.width
+                override val height = bitmap.height
+                override fun getPixels(pixels: IntArray, stride: Int, x: Int, y: Int, width: Int, height: Int) =
+                    bitmap.getPixels(pixels, 0, stride, x, y, width, height)
+            }
+        }
+    }
+
+    /** Applies copies and orientation; separate from [Bitmap] so it can be unit tested. */
+    internal fun writeLaidOutJob(out: OutputStream, pageCount: Int, options: PrintOptions, renderPage: (index: Int) -> PagePixels) {
+        require(options.copies > 0)
+        writePages(out, pageCount * options.copies, options.quality, options.grayscale) { index ->
+            val page = renderPage(index % pageCount)
+            if (options.landscape) {
+                // Row y of the rotated page is column (width - 1 - y) of the page, read top to bottom.
+                PageImage(page.height, page.width) { y, row ->
+                    page.getPixels(row, 1, page.width - 1 - y, 0, 1, page.height)
+                }
+            } else {
+                PageImage(page.width, page.height) { y, row ->
+                    page.getPixels(row, page.width, 0, y, page.width, 1)
+                }
             }
         }
     }
 
     /** hpcups sends the job header once, then the same page header before every page. */
-    internal fun writePages(out: OutputStream, pageCount: Int, page: (index: Int) -> PageImage) {
+    internal fun writePages(
+        out: OutputStream,
+        pageCount: Int,
+        quality: PrintQuality = PrintQuality.Normal,
+        grayscale: Boolean = false,
+        page: (index: Int) -> PageImage
+    ) {
         require(pageCount > 0)
         writeJobHeader(out)
         for (index in 0 until pageCount) {
-            writePage(out, page(index))
+            writePage(out, page(index), quality, grayscale)
         }
         out.write(RESET)
         out.write(UEL)
@@ -74,26 +139,27 @@ class Pcl3GuiDriver {
      * The image is scaled to fit the printable area, keeping its aspect ratio, and centred
      * horizontally at the top of the page.
      */
-    private fun writePage(out: OutputStream, image: PageImage) {
+    private fun writePage(out: OutputStream, image: PageImage, quality: PrintQuality, grayscale: Boolean) {
         val (imageWidth, imageHeight) = image.width to image.height
-        writePageHeader(out)
+        val (printableWidth, printableHeight) = quality.printableWidth to quality.printableHeight
+        writePageHeader(out, quality, grayscale)
 
-        // Fit in inches, then convert to device pixels (horizontal and vertical dpi differ).
+        // Fit in inches, then convert to device pixels (horizontal and vertical dpi may differ).
         val scale = minOf(
-            PRINTABLE_WIDTH.toDouble() / H_DPI / imageWidth,
-            PRINTABLE_HEIGHT.toDouble() / V_DPI / imageHeight
+            printableWidth.toDouble() / quality.hDpi / imageWidth,
+            printableHeight.toDouble() / quality.vDpi / imageHeight
         )
-        val dstWidth = (imageWidth * scale * H_DPI).toInt().coerceIn(1, PRINTABLE_WIDTH)
-        val dstHeight = (imageHeight * scale * V_DPI).toInt().coerceIn(1, PRINTABLE_HEIGHT)
-        val left = (PRINTABLE_WIDTH - dstWidth) / 2
+        val dstWidth = (imageWidth * scale * quality.hDpi).toInt().coerceIn(1, printableWidth)
+        val dstHeight = (imageHeight * scale * quality.vDpi).toInt().coerceIn(1, printableHeight)
+        val left = (printableWidth - dstWidth) / 2
 
-        val compressor = Mode10Compressor(PRINTABLE_WIDTH)
+        val compressor = Mode10Compressor(printableWidth)
         val source = IntArray(imageWidth)
         var sourceY = -1
-        val line = IntArray(PRINTABLE_WIDTH)
+        val line = IntArray(printableWidth)
         var skipped = 0
 
-        for (y in 0 until PRINTABLE_HEIGHT) {
+        for (y in 0 until printableHeight) {
             line.fill(WHITE_RGB)
             if (y < dstHeight) {
                 val sy = (y.toLong() * imageHeight / dstHeight).toInt()
@@ -138,9 +204,10 @@ class Pcl3GuiDriver {
         )
     }
 
-    private fun writePageHeader(out: OutputStream) {
-        // Media source (7 = auto), media type (0 = plain), page size (26 = A4), print quality (0 = normal)
-        out.write("\u001B&l7H\u001B&l0M\u001B&l26A\u001B*o0M".toByteArray())
+    private fun writePageHeader(out: OutputStream, quality: PrintQuality, grayscale: Boolean) {
+        val (hDpi, vDpi) = quality.hDpi to quality.vDpi
+        // Media source (7 = auto), media type (0 = plain), page size (26 = A4), print quality
+        out.write("\u001B&l7H\u001B&l0M\u001B&l26A\u001B*o${quality.pclQuality}M".toByteArray())
         // Media subtype: Esc*o5W 0D 03 00 + 16-bit subtype (0)
         out.write(byteArrayOf(ESC, '*'.code.toByte(), 'o'.code.toByte(), '5'.code.toByte(), 'W'.code.toByte(), 0x0D, 0x03, 0x00, 0x00, 0x00))
         // Configure Raster Data: format 6, RGB only, 1 component, H/V resolution,
@@ -149,14 +216,19 @@ class Pcl3GuiDriver {
             byteArrayOf(
                 ESC, '*'.code.toByte(), 'g'.code.toByte(), '1'.code.toByte(), '2'.code.toByte(), 'W'.code.toByte(),
                 0x06, 0x07, 0x00, 0x01,
-                (H_DPI shr 8).toByte(), H_DPI.toByte(), (V_DPI shr 8).toByte(), V_DPI.toByte(),
+                (hDpi shr 8).toByte(), hDpi.toByte(), (vDpi shr 8).toByte(), vDpi.toByte(),
                 0x0A, 0x01, 0x20, 0x01
             )
         )
-        out.write("\u001B&u${V_DPI}D\u001B*t${V_DPI}R\u001B*r${PRINTABLE_WIDTH}S".toByteArray())
+        if (grayscale) {
+            // Esc*o5W 0B 01 00 00 + colour mode (2 = black only); rows stay RGB, the printer converts.
+            out.write(byteArrayOf(ESC, '*'.code.toByte(), 'o'.code.toByte(), '5'.code.toByte(), 'W'.code.toByte(), 0x0B, 0x01, 0x00, 0x00, 0x02))
+        }
+        // Unit of measure is the lower of the two resolutions (hpcups).
+        out.write("\u001B&u${minOf(hDpi, vDpi)}D\u001B*t${vDpi}R\u001B*r${quality.printableWidth}S".toByteArray())
         out.write("\u001B&l-2H".toByteArray()) // media pre-load
         out.write("\u001B*r1A".toByteArray()) // start raster graphics
-        out.write("\u001B*p${TOP_MARGIN}Y".toByteArray())
+        out.write("\u001B*p${quality.topMargin}Y".toByteArray())
     }
 
     /** Composites an ARGB pixel on white paper and returns 0xRRGGBB. */
@@ -173,15 +245,5 @@ class Pcl3GuiDriver {
         private val UEL = "\u001B%-12345X".toByteArray()
 
         private const val WHITE_RGB = 0xFFFFFF
-        private const val H_DPI = 600
-        private const val V_DPI = 300
-
-        // A4 imageable area of the hpcups PPD (HWMargins 9 41.04 9 4.32 pt) at 600x300 dpi.
-        // Width is the value Ghostscript renders (cupsWidth); height is rounded down slightly.
-        internal const val PRINTABLE_WIDTH = 4810
-        internal const val PRINTABLE_HEIGHT = 3316
-
-        // hpcups: printable_start_y (4 pt at 300 dpi = 16) minus HPMechOffset 60/1000 in (18).
-        private const val TOP_MARGIN = -2
     }
 }
