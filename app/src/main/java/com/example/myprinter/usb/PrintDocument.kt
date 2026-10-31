@@ -16,12 +16,15 @@ import java.io.IOException
 sealed class PrintDocument : Closeable {
     abstract val pageCount: Int
 
-    /** The returned bitmap stays valid until the next call or [close]. */
-    abstract fun renderPage(index: Int): Bitmap
+    /**
+     * The returned bitmap stays valid until the next call or [close].
+     * [dpi] applies to PDF pages; images are returned at their own resolution.
+     */
+    abstract fun renderPage(index: Int, dpi: Int = PRINT_DPI): Bitmap
 
     private class Image(private val bitmap: Bitmap) : PrintDocument() {
         override val pageCount = 1
-        override fun renderPage(index: Int) = bitmap
+        override fun renderPage(index: Int, dpi: Int) = bitmap
         override fun close() = bitmap.recycle()
     }
 
@@ -30,13 +33,13 @@ sealed class PrintDocument : Closeable {
 
         override val pageCount = renderer.pageCount
 
-        override fun renderPage(index: Int): Bitmap {
+        override fun renderPage(index: Int, dpi: Int): Bitmap {
             // Free the previous page first: a 300 dpi A4 page is ~35 MB.
             current?.recycle()
             current = null
             return renderer.openPage(index).use { page ->
                 // PDF page sizes are in points (1/72 inch).
-                val bitmap = Bitmap.createBitmap(page.width * RENDER_DPI / 72, page.height * RENDER_DPI / 72, Bitmap.Config.ARGB_8888)
+                val bitmap = Bitmap.createBitmap(page.width * dpi / 72, page.height * dpi / 72, Bitmap.Config.ARGB_8888)
                 bitmap.eraseColor(Color.WHITE)
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 current = bitmap
@@ -52,13 +55,15 @@ sealed class PrintDocument : Closeable {
     }
 
     companion object {
-        // Matches the printer's vertical resolution; horizontal is upscaled to 600 dpi by the driver.
-        private const val RENDER_DPI = 300
+        // Matches the printer's vertical resolution in Draft and Normal; the driver rescales as needed.
+        private const val PRINT_DPI = 300
+
+        fun isPdf(context: Context, uri: Uri) = context.contentResolver.getType(uri) == "application/pdf"
 
         /** @throws IOException if the file cannot be read; [SecurityException] for a password-protected PDF. */
         fun open(context: Context, uri: Uri): PrintDocument {
             val resolver = context.contentResolver
-            if (resolver.getType(uri) == "application/pdf") {
+            if (isPdf(context, uri)) {
                 val fd = resolver.openFileDescriptor(uri, "r") ?: throw IOException("Cannot open $uri")
                 return try {
                     Pdf(fd, PdfRenderer(fd))

@@ -5,8 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Print
 import androidx.compose.material.icons.rounded.Usb
@@ -30,7 +28,6 @@ import com.example.myprinter.ui.theme.MyPrinterTheme
 @Composable
 fun FileSelectionScreen(
     viewModel: PrintJobViewModel,
-    onBack: () -> Unit,
     onNavigateToPrinter: () -> Unit,
     onNavigateToPrintPreview: (Uri) -> Unit
 ) {
@@ -45,14 +42,7 @@ fun FileSelectionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Select File") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
+            TopAppBar(title = { Text("MyPrinter") })
         }
     ) { innerPadding ->
         Column(
@@ -137,8 +127,7 @@ fun FileSelectionScreenPreview() {
     MyPrinterTheme {
         FileSelectionScreen(
             viewModel = PrintJobViewModel(),
-            onBack = {}, 
-            onNavigateToPrinter = {}, 
+            onNavigateToPrinter = {},
             onNavigateToPrintPreview = {}
         )
     }
@@ -168,19 +157,21 @@ fun PreviewSection(uri: Uri) {
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
+            } else if (mimeType == "application/pdf") {
+                PdfPreview(uri, Modifier.fillMaxSize())
             } else {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
-                        imageVector = if (mimeType == "application/pdf") Icons.Rounded.Description else Icons.Rounded.UploadFile,
+                        imageVector = Icons.Rounded.UploadFile,
                         contentDescription = null,
                         modifier = Modifier.size(80.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "PDF Document",
+                        text = "Unsupported file",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
