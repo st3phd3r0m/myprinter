@@ -66,13 +66,51 @@ enum class PrintQuality(
  * @param copies the whole document is repeated (collated copies).
  * @param landscape each page is rotated 90° counter-clockwise onto the portrait sheet.
  * @param grayscale printed with black ink only (hpcups "Black Only Grayscale").
+ * @param pages zero-based indexes of the pages to print, in order; null for all pages.
  */
 data class PrintOptions(
     val copies: Int = 1,
     val landscape: Boolean = false,
     val grayscale: Boolean = false,
-    val quality: PrintQuality = PrintQuality.Normal
+    val quality: PrintQuality = PrintQuality.Normal,
+    val pages: List<Int>? = null
 )
+
+/**
+ * Parses a page selection such as "1-3, 5" for a document of [pageCount] pages.
+ * Returns zero-based indexes in ascending order without duplicates, null for a blank text
+ * (all pages), or throws [IllegalArgumentException] if a page is out of range or malformed.
+ */
+fun parsePageRanges(text: String, pageCount: Int): List<Int>? {
+    if (text.isBlank()) return null
+    val pages = sortedSetOf<Int>()
+    for (part in text.split(',', ';').map { it.trim() }.filter { it.isNotEmpty() }) {
+        val bounds = part.split('-').map { it.trim() }
+        require(bounds.size in 1..2) { "Malformed range: $part" }
+        val first = bounds[0].toIntOrNull() ?: throw IllegalArgumentException("Not a page: $part")
+        val last = if (bounds.size == 2) bounds[1].toIntOrNull() ?: throw IllegalArgumentException("Not a page: $part") else first
+        require(first in 1..last && last <= pageCount) { "Out of range: $part" }
+        for (page in first..last) pages += page - 1
+    }
+    require(pages.isNotEmpty()) { "No page selected" }
+    return pages.toList()
+}
+
+/** Page numbers to keep, e.g. to print both sides by hand: odd pages, then even ones. */
+enum class PageParity { All, Odd, Even }
+
+/**
+ * [parsePageRanges] (blank meaning all pages), then keeps the pages of the given [parity]
+ * (by page number, so Odd keeps pages 1, 3, 5...). Returns null for all pages; throws
+ * [IllegalArgumentException] if the ranges are invalid or no page is left.
+ */
+fun selectPages(text: String, parity: PageParity, pageCount: Int): List<Int>? {
+    val pages = parsePageRanges(text, pageCount)
+    if (parity == PageParity.All) return pages
+    val kept = (pages ?: (0 until pageCount).toList()).filter { index -> (index % 2 == 0) == (parity == PageParity.Odd) }
+    require(kept.isNotEmpty()) { "No ${parity.name.lowercase()} page in the selection" }
+    return kept
+}
 
 /**
  * PCL3GUI driver for the HP Deskjet 1510, mirroring what HPLIP's hpcups filter sends
@@ -100,11 +138,13 @@ class Pcl3GuiDriver {
         }
     }
 
-    /** Applies copies and orientation; separate from [Bitmap] so it can be unit tested. */
+    /** Applies page selection, copies and orientation; separate from [Bitmap] so it can be unit tested. */
     internal fun writeLaidOutJob(out: OutputStream, pageCount: Int, options: PrintOptions, renderPage: (index: Int) -> PagePixels) {
         require(options.copies > 0)
-        writePages(out, pageCount * options.copies, options.quality, options.grayscale) { index ->
-            val page = renderPage(index % pageCount)
+        val pages = options.pages ?: (0 until pageCount).toList()
+        require(pages.isNotEmpty() && pages.all { it in 0 until pageCount })
+        writePages(out, pages.size * options.copies, options.quality, options.grayscale) { index ->
+            val page = renderPage(pages[index % pages.size])
             if (options.landscape) {
                 // Row y of the rotated page is column (width - 1 - y) of the page, read top to bottom.
                 PageImage(page.height, page.width) { y, row ->

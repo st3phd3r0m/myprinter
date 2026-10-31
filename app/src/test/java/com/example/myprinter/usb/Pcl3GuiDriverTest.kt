@@ -133,6 +133,43 @@ class Pcl3GuiDriverTest {
     }
 
     @Test
+    fun pageSelection_printsOnlyTheChosenPagesForEachCopy() {
+        val rendered = mutableListOf<Int>()
+        val out = ByteArrayOutputStream()
+        Pcl3GuiDriver().writeLaidOutJob(out, 6, PrintOptions(copies = 2, pages = listOf(0, 2, 3))) { index ->
+            rendered += index
+            FakePage(10, 10) { _, _ -> 0xFF000000.toInt() }
+        }
+        assertEquals(listOf(0, 2, 3, 0, 2, 3), rendered)
+    }
+
+    @Test
+    fun parsePageRanges_acceptsListsAndRanges() {
+        assertEquals(null, parsePageRanges("  ", 6))
+        assertEquals(listOf(0, 1, 2, 4), parsePageRanges("1-3, 5", 6))
+        assertEquals(listOf(1, 3, 4, 5), parsePageRanges("6,4-5 ; 2, 4", 6)) // sorted, no duplicates
+        assertEquals(listOf(5), parsePageRanges("6", 6))
+    }
+
+    @Test
+    fun parsePageRanges_rejectsInvalidInput() {
+        for (text in listOf("0", "7", "3-2", "1-7", "a", "1-2-3", "-", ",", "1-")) {
+            val rejected = runCatching { parsePageRanges(text, 6) }.exceptionOrNull() is IllegalArgumentException
+            assertTrue("\"$text\" should be rejected", rejected)
+        }
+    }
+
+    @Test
+    fun selectPages_keepsOddOrEvenPageNumbers() {
+        assertEquals(null, selectPages("", PageParity.All, 5))
+        assertEquals(listOf(0, 2, 4), selectPages("", PageParity.Odd, 5))   // pages 1, 3, 5
+        assertEquals(listOf(1, 3), selectPages("", PageParity.Even, 5))     // pages 2, 4
+        assertEquals(listOf(3, 5), selectPages("3-6", PageParity.Even, 6))  // pages 4, 6
+        assertTrue(runCatching { selectPages("1", PageParity.Even, 6) }.exceptionOrNull() is IllegalArgumentException)
+        assertTrue(runCatching { selectPages("9", PageParity.Odd, 6) }.exceptionOrNull() is IllegalArgumentException)
+    }
+
+    @Test
     fun encodePage_writesSamplePageForExternalCheck() {
         // A 4:3 image: black frame, red/green/blue squares, grey gradient band.
         val w = 400

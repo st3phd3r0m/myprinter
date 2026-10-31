@@ -21,6 +21,13 @@
     <string name="setting_color">Couleur :</string>
     <string name="color_color">Couleur</string>
     <string name="color_grayscale">Monochrome</string>
+    <string name="setting_pages">Pages (sur %1$d)</string>
+    <string name="pages_hint">Toutes, ou par ex. 1-3, 5</string>
+    <string name="pages_invalid">Pages invalides : numéros de 1 à %1$d, par ex. 1-3, 5</string>
+    <string name="pages_none">Aucune page à imprimer : pas de page paire ou impaire dans cette sélection</string>
+    <string name="parity_all">Toutes</string>
+    <string name="parity_odd">Impaires</string>
+    <string name="parity_even">Paires</string>
     <string name="setting_quality">Qualité :</string>
     <string name="quality_draft">Brouillon</string>
     <string name="quality_normal">Normal</string>

@@ -39,6 +39,9 @@ import com.example.myprinter.ui.viewmodel.PrinterViewModel
 import com.example.myprinter.usb.PrintDocument
 import com.example.myprinter.usb.PrintOptions
 import com.example.myprinter.usb.PrintQuality
+import com.example.myprinter.usb.PageParity
+import com.example.myprinter.usb.parsePageRanges
+import com.example.myprinter.usb.selectPages
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -53,6 +56,17 @@ fun PrintPreviewScreen(
     val settings by viewModel.currentSettings.collectAsState()
     val printJobs by viewModel.printJobs.collectAsState()
     val selectedUri by viewModel.selectedUri.collectAsState()
+
+    // The page selection belongs to the document: reset when another file is selected.
+    var pageCount by remember(selectedUri) { mutableIntStateOf(1) }
+    var pagesText by remember(selectedUri) { mutableStateOf("") }
+    var parity by remember(selectedUri) { mutableStateOf(PageParity.All) }
+    val pageSelection = runCatching { selectPages(pagesText, parity, pageCount) }
+    val pagesError = when {
+        pageSelection.isSuccess -> null
+        runCatching { parsePageRanges(pagesText, pageCount) }.isFailure -> stringResource(R.string.pages_invalid, pageCount)
+        else -> stringResource(R.string.pages_none)
+    }
 
     Scaffold(
         topBar = {
@@ -77,32 +91,49 @@ fun PrintPreviewScreen(
                     settings = settings,
                     printJobs = printJobs,
                     preview = if (detailHidden) {
-                        { PreviewPane(uri = selectedUri, settings = settings, modifier = Modifier.fillMaxWidth().height(420.dp)) }
+                        {
+                            PreviewPane(
+                                uri = selectedUri,
+                                settings = settings,
+                                modifier = Modifier.fillMaxWidth().height(420.dp),
+                                onPageCount = { pageCount = it }
+                            )
+                        }
                     } else {
                         null
                     },
+                    pages = PageSelectionState(pageCount, pagesText, parity, pagesError),
+                    onPagesTextChange = { pagesText = it },
+                    onParityChange = { parity = it },
                     onSettingsChange = { viewModel.updateSettings(it) },
-                    onPrint = { 
+                    onPrint = {
+                        val options = settings.copy(pages = pageSelection.getOrNull())
                         selectedUri?.let { uri ->
                             viewModel.startPrintJob(uri.lastPathSegment ?: "Document") {
-                                printerViewModel.printDocument(uri, settings)
+                                printerViewModel.printDocument(uri, options)
                             }
                         }
                     }
                 )
             },
             detailPane = {
-                PreviewPane(uri = selectedUri, settings = settings)
+                PreviewPane(uri = selectedUri, settings = settings, onPageCount = { pageCount = it })
             }
         )
     }
 }
+
+/** The document's page selection as typed by the user; [error] is null when it can be printed. */
+data class PageSelectionState(val pageCount: Int, val text: String, val parity: PageParity, val error: String?)
 
 @Composable
 fun SettingsAndQueuePane(
     settings: PrintOptions,
     printJobs: List<PrintJob>,
     preview: (@Composable () -> Unit)?,
+    pages: PageSelectionState,
+    onPagesTextChange: (String) -> Unit,
+    onParityChange: (PageParity) -> Unit,
     onSettingsChange: (PrintOptions) -> Unit,
     onPrint: () -> Unit
 ) {
@@ -116,10 +147,11 @@ fun SettingsAndQueuePane(
         item {
             Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
-            PrintSettingsCard(settings, onSettingsChange)
+            PrintSettingsCard(settings, onSettingsChange, pages, onPagesTextChange, onParityChange)
             Spacer(modifier = Modifier.height(24.dp))
             ElevatedButton(
                 onClick = onPrint,
+                enabled = pages.error == null,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = MaterialTheme.shapes.large,
                 colors = ButtonDefaults.elevatedButtonColors(
@@ -152,13 +184,39 @@ fun SettingsAndQueuePane(
 @Composable
 fun PrintSettingsCard(
     settings: PrintOptions,
-    onSettingsChange: (PrintOptions) -> Unit
+    onSettingsChange: (PrintOptions) -> Unit,
+    pages: PageSelectionState,
+    onPagesTextChange: (String) -> Unit,
+    onParityChange: (PageParity) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            // Pages, for multi-page documents only
+            if (pages.pageCount > 1) {
+                OutlinedTextField(
+                    value = pages.text,
+                    onValueChange = onPagesTextChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.setting_pages, pages.pageCount)) },
+                    placeholder = { Text(stringResource(R.string.pages_hint)) },
+                    singleLine = true,
+                    isError = pages.error != null,
+                    supportingText = pages.error?.let { error -> { Text(error) } }
+                )
+                SegmentedButton(
+                    options = listOf(
+                        PageParity.All to stringResource(R.string.parity_all),
+                        PageParity.Odd to stringResource(R.string.parity_odd),
+                        PageParity.Even to stringResource(R.string.parity_even)
+                    ),
+                    selectedOption = pages.parity,
+                    onOptionSelected = onParityChange
+                )
+            }
+
             // Copies
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.setting_copies), modifier = Modifier.weight(1f))
@@ -278,7 +336,12 @@ fun PrintJobItem(job: PrintJob) {
 }
 
 @Composable
-fun PreviewPane(uri: Uri?, settings: PrintOptions, modifier: Modifier = Modifier.fillMaxSize()) {
+fun PreviewPane(
+    uri: Uri?,
+    settings: PrintOptions,
+    modifier: Modifier = Modifier.fillMaxSize(),
+    onPageCount: (Int) -> Unit = {}
+) {
     val context = LocalContext.current
     val isPdf = remember(uri) { uri != null && PrintDocument.isPdf(context, uri) }
     val colorFilter = if (settings.grayscale) {
@@ -301,7 +364,7 @@ fun PreviewPane(uri: Uri?, settings: PrintOptions, modifier: Modifier = Modifier
             ) {
                 val pageModifier = Modifier.fillMaxSize().background(Color.White)
                 if (isPdf) {
-                    PdfPreview(uri, pageModifier, colorFilter)
+                    PdfPreview(uri, pageModifier, colorFilter, onPageCount)
                 } else {
                     AsyncImage(
                         model = uri,
@@ -320,11 +383,17 @@ fun PreviewPane(uri: Uri?, settings: PrintOptions, modifier: Modifier = Modifier
 
 /** Renders the pages of a PDF in the background, with page navigation for multi-page documents. */
 @Composable
-fun PdfPreview(uri: Uri, modifier: Modifier = Modifier, colorFilter: ColorFilter? = null) {
+fun PdfPreview(
+    uri: Uri,
+    modifier: Modifier = Modifier,
+    colorFilter: ColorFilter? = null,
+    onPageCount: (Int) -> Unit = {}
+) {
     val context = LocalContext.current
     var pageIndex by remember(uri) { mutableIntStateOf(0) }
     val document by produceState<Result<PrintDocument>?>(null, uri) {
         value = withContext(Dispatchers.IO) { runCatching { PrintDocument.open(context, uri) } }
+        value?.getOrNull()?.let { onPageCount(it.pageCount) }
         awaitDispose { value?.getOrNull()?.let { synchronized(it) { it.close() } } }
     }
     val page by produceState<ImageBitmap?>(null, document, pageIndex) {
