@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import com.example.myprinter.R
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -38,7 +39,7 @@ class LogManager(private val context: Context) {
      * Copies the internal log file to the public Downloads folder.
      */
     fun exportToDownloads(): String {
-        if (!logFile.exists()) return "No logs to export"
+        if (!logFile.exists()) return context.getString(R.string.logs_none)
 
         val fileName = "MyPrinter_Logs_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.txt"
         
@@ -59,8 +60,8 @@ class LogManager(private val context: Context) {
                             input.copyTo(output)
                         }
                     }
-                    "Logs saved to Downloads/$fileName"
-                } ?: "Failed to create file in Downloads"
+                    context.getString(R.string.logs_saved, "Downloads/$fileName")
+                } ?: context.getString(R.string.logs_create_failed)
             } else {
                 // Legacy way for older versions
                 val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -70,11 +71,11 @@ class LogManager(private val context: Context) {
                         input.copyTo(output)
                     }
                 }
-                "Logs saved to ${targetFile.absolutePath}"
+                context.getString(R.string.logs_saved, targetFile.absolutePath)
             }
         } catch (e: Exception) {
             Log.e("LogManager", "Export failed", e)
-            "Error: ${e.message}"
+            context.getString(R.string.logs_error, e.message)
         }
     }
 

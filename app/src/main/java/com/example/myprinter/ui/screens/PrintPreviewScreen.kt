@@ -26,16 +26,19 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.myprinter.R
 import com.example.myprinter.ui.viewmodel.PrintJob
 import com.example.myprinter.ui.viewmodel.PrintJobStatus
 import com.example.myprinter.ui.viewmodel.PrintJobViewModel
-import com.example.myprinter.ui.viewmodel.PrintSettings
 import com.example.myprinter.ui.viewmodel.PrinterViewModel
 import com.example.myprinter.usb.PrintDocument
+import com.example.myprinter.usb.PrintOptions
+import com.example.myprinter.usb.PrintQuality
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -54,10 +57,10 @@ fun PrintPreviewScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Print Preview & Queue") },
+                title = { Text(stringResource(R.string.print_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -97,10 +100,10 @@ fun PrintPreviewScreen(
 
 @Composable
 fun SettingsAndQueuePane(
-    settings: PrintSettings,
+    settings: PrintOptions,
     printJobs: List<PrintJob>,
     preview: (@Composable () -> Unit)?,
-    onSettingsChange: (PrintSettings) -> Unit,
+    onSettingsChange: (PrintOptions) -> Unit,
     onPrint: () -> Unit
 ) {
     LazyColumn(
@@ -111,7 +114,7 @@ fun SettingsAndQueuePane(
             item { preview() }
         }
         item {
-            Text("Print Settings", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.settings_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
             PrintSettingsCard(settings, onSettingsChange)
             Spacer(modifier = Modifier.height(24.dp))
@@ -126,17 +129,17 @@ fun SettingsAndQueuePane(
             ) {
                 Icon(Icons.Rounded.Print, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Print Now", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.print_now), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
 
         item {
-            Text("Print Queue", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.queue_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
         if (printJobs.isEmpty()) {
             item {
-                Text("No recent jobs", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.queue_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
             items(printJobs) { job ->
@@ -148,8 +151,8 @@ fun SettingsAndQueuePane(
 
 @Composable
 fun PrintSettingsCard(
-    settings: PrintSettings,
-    onSettingsChange: (PrintSettings) -> Unit
+    settings: PrintOptions,
+    onSettingsChange: (PrintOptions) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -158,7 +161,7 @@ fun PrintSettingsCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             // Copies
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Copies:", modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.setting_copies), modifier = Modifier.weight(1f))
                 IconButton(onClick = { if (settings.copies > 1) onSettingsChange(settings.copy(copies = settings.copies - 1)) }) {
                     Icon(Icons.Rounded.Remove, contentDescription = null)
                 }
@@ -170,29 +173,33 @@ fun PrintSettingsCard(
 
             // Orientation
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Orientation:", modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.setting_orientation), modifier = Modifier.weight(1f))
                 SegmentedButton(
-                    options = listOf("Portrait", "Landscape"),
-                    selectedOption = settings.orientation,
-                    onOptionSelected = { onSettingsChange(settings.copy(orientation = it)) }
+                    options = listOf(false to stringResource(R.string.orientation_portrait), true to stringResource(R.string.orientation_landscape)),
+                    selectedOption = settings.landscape,
+                    onOptionSelected = { onSettingsChange(settings.copy(landscape = it)) }
                 )
             }
 
             // Color Mode
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Color:", modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.setting_color), modifier = Modifier.weight(1f))
                 SegmentedButton(
-                    options = listOf("Color", "Monochrome"),
-                    selectedOption = settings.colorMode,
-                    onOptionSelected = { onSettingsChange(settings.copy(colorMode = it)) }
+                    options = listOf(false to stringResource(R.string.color_color), true to stringResource(R.string.color_grayscale)),
+                    selectedOption = settings.grayscale,
+                    onOptionSelected = { onSettingsChange(settings.copy(grayscale = it)) }
                 )
             }
 
             // Print quality
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Qualité :", modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.setting_quality), modifier = Modifier.weight(1f))
                 SegmentedButton(
-                    options = listOf("Brouillon", "Normal", "Optimal"),
+                    options = listOf(
+                        PrintQuality.Draft to stringResource(R.string.quality_draft),
+                        PrintQuality.Normal to stringResource(R.string.quality_normal),
+                        PrintQuality.Best to stringResource(R.string.quality_best)
+                    ),
                     selectedOption = settings.quality,
                     onOptionSelected = { onSettingsChange(settings.copy(quality = it)) }
                 )
@@ -201,16 +208,17 @@ fun PrintSettingsCard(
     }
 }
 
+/** [options] are value/label pairs. */
 @Composable
-fun SegmentedButton(
-    options: List<String>,
-    selectedOption: String,
-    onOptionSelected: (String) -> Unit
+fun <T> SegmentedButton(
+    options: List<Pair<T, String>>,
+    selectedOption: T,
+    onOptionSelected: (T) -> Unit
 ) {
     Row(
         modifier = Modifier.background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small).padding(2.dp)
     ) {
-        options.forEach { option ->
+        options.forEach { (option, label) ->
             val isSelected = option == selectedOption
             Surface(
                 onClick = { onOptionSelected(option) },
@@ -220,7 +228,7 @@ fun SegmentedButton(
                 modifier = Modifier.height(32.dp).padding(horizontal = 4.dp)
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
-                    Text(option, style = MaterialTheme.typography.labelMedium)
+                    Text(label, style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
@@ -245,7 +253,17 @@ fun PrintJobItem(job: PrintJob) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(job.fileName, fontWeight = FontWeight.Bold)
-                    Text(job.status.name, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        stringResource(
+                            when (job.status) {
+                                PrintJobStatus.Pending -> R.string.job_pending
+                                PrintJobStatus.Printing -> R.string.job_printing
+                                PrintJobStatus.Completed -> R.string.job_completed
+                                PrintJobStatus.Error -> R.string.job_error
+                            }
+                        ),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
                 if (job.status == PrintJobStatus.Printing) {
                     Text("${(job.progress * 100).toInt()}%", style = MaterialTheme.typography.labelLarge)
@@ -260,10 +278,10 @@ fun PrintJobItem(job: PrintJob) {
 }
 
 @Composable
-fun PreviewPane(uri: Uri?, settings: PrintSettings, modifier: Modifier = Modifier.fillMaxSize()) {
+fun PreviewPane(uri: Uri?, settings: PrintOptions, modifier: Modifier = Modifier.fillMaxSize()) {
     val context = LocalContext.current
     val isPdf = remember(uri) { uri != null && PrintDocument.isPdf(context, uri) }
-    val colorFilter = if (settings.colorMode == "Monochrome") {
+    val colorFilter = if (settings.grayscale) {
         ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
     } else {
         null
@@ -277,8 +295,8 @@ fun PreviewPane(uri: Uri?, settings: PrintSettings, modifier: Modifier = Modifie
             // The sheet as seen when holding it in the chosen orientation.
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(if (settings.orientation == "Portrait") 0.8f else 0.95f)
-                    .aspectRatio(if (settings.orientation == "Portrait") 0.7f else 1.4f),
+                    .fillMaxWidth(if (settings.landscape) 0.95f else 0.8f)
+                    .aspectRatio(if (settings.landscape) 1.4f else 0.7f),
                 elevation = CardDefaults.cardElevation(8.dp)
             ) {
                 val pageModifier = Modifier.fillMaxSize().background(Color.White)
@@ -287,7 +305,7 @@ fun PreviewPane(uri: Uri?, settings: PrintSettings, modifier: Modifier = Modifie
                 } else {
                     AsyncImage(
                         model = uri,
-                        contentDescription = "Preview",
+                        contentDescription = stringResource(R.string.preview),
                         modifier = pageModifier,
                         contentScale = ContentScale.Fit,
                         colorFilter = colorFilter
@@ -295,7 +313,7 @@ fun PreviewPane(uri: Uri?, settings: PrintSettings, modifier: Modifier = Modifie
                 }
             }
         } else {
-            Text("No file selected for preview")
+            Text(stringResource(R.string.preview_none))
         }
     }
 }
@@ -324,8 +342,8 @@ fun PdfPreview(uri: Uri, modifier: Modifier = Modifier, colorFilter: ColorFilter
     Box(modifier, contentAlignment = Alignment.Center) {
         val current = page
         when {
-            document?.isFailure == true -> Text("Aperçu indisponible")
-            current != null -> Image(current, contentDescription = "Preview", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit, colorFilter = colorFilter)
+            document?.isFailure == true -> Text(stringResource(R.string.preview_unavailable))
+            current != null -> Image(current, contentDescription = stringResource(R.string.preview), modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit, colorFilter = colorFilter)
             else -> CircularProgressIndicator()
         }
         if (pageCount > 1) {
@@ -336,11 +354,11 @@ fun PdfPreview(uri: Uri, modifier: Modifier = Modifier, colorFilter: ColorFilter
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { pageIndex-- }, enabled = pageIndex > 0) {
-                        Icon(Icons.Rounded.ChevronLeft, contentDescription = "Page précédente")
+                        Icon(Icons.Rounded.ChevronLeft, contentDescription = stringResource(R.string.page_previous))
                     }
                     Text("${pageIndex + 1} / $pageCount", style = MaterialTheme.typography.labelLarge)
                     IconButton(onClick = { pageIndex++ }, enabled = pageIndex < pageCount - 1) {
-                        Icon(Icons.Rounded.ChevronRight, contentDescription = "Page suivante")
+                        Icon(Icons.Rounded.ChevronRight, contentDescription = stringResource(R.string.page_next))
                     }
                 }
             }

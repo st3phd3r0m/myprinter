@@ -1,3 +1,82 @@
 <resources>
     <string name="app_name">MyPrinter</string>
+    <string name="back">Back</string>
+
+    <!-- File selection -->
+    <string name="file_none">No file selected</string>
+    <string name="file_hint">Pick an image or PDF to print</string>
+    <string name="file_choose">Choose a file</string>
+    <string name="file_printer">Printer</string>
+    <string name="file_print">Print</string>
+    <string name="file_change">Change file</string>
+    <string name="file_selected_image">Selected image</string>
+    <string name="file_unsupported">Unsupported file</string>
+
+    <!-- Print screen -->
+    <string name="print_title">Print</string>
+    <string name="settings_title">Print settings</string>
+    <string name="setting_copies">Copies:</string>
+    <string name="setting_orientation">Orientation:</string>
+    <string name="orientation_portrait">Portrait</string>
+    <string name="orientation_landscape">Landscape</string>
+    <string name="setting_color">Color:</string>
+    <string name="color_color">Color</string>
+    <string name="color_grayscale">Monochrome</string>
+    <string name="setting_quality">Quality:</string>
+    <string name="quality_draft">Draft</string>
+    <string name="quality_normal">Normal</string>
+    <string name="quality_best">Best</string>
+    <string name="print_now">Print now</string>
+    <string name="queue_title">Print queue</string>
+    <string name="queue_empty">No recent jobs</string>
+    <string name="job_pending">Pending</string>
+    <string name="job_printing">Printing</string>
+    <string name="job_completed">Completed</string>
+    <string name="job_error">Error</string>
+    <string name="preview_none">No file selected for preview</string>
+    <string name="preview">Preview</string>
+    <string name="preview_unavailable">Preview unavailable</string>
+    <string name="page_previous">Previous page</string>
+    <string name="page_next">Next page</string>
+
+    <!-- Printer connection -->
+    <string name="connect_title">Connect printer</string>
+    <string name="refresh">Refresh</string>
+    <string name="printers_available">Available printers</string>
+    <string name="printers_none">No printers found. Connect a USB printer.</string>
+    <string name="printer_unknown">Unknown printer</string>
+    <string name="logs_title">System logs</string>
+    <string name="logs_clear">Clear</string>
+    <string name="logs_save">Save logs</string>
+    <string name="state_disconnected">Disconnected</string>
+    <string name="state_requesting">Requesting permission…</string>
+    <string name="state_connected">Connected: %1$s</string>
+    <string name="state_error">Error: %1$s</string>
+    <string name="status_label">Printer status:</string>
+    <string name="status_hint">Tap refresh to check the status</string>
+    <string name="status_refresh">Refresh status</string>
+    <string name="send_test_file">Send a print file (test)</string>
+
+    <!-- Printer status and errors -->
+    <string name="status_not_connected">Not connected</string>
+    <string name="status_endpoint_missing">USB endpoint missing</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_online">Online</string>
+    <string name="status_no_response">No status response</string>
+    <string name="error_permission_denied">Permission denied</string>
+    <string name="error_no_interface">No printer interface</string>
+    <string name="error_claim">Could not claim the USB interface</string>
+    <string name="error_open">Could not open the USB device</string>
+
+    <!-- Test file sending -->
+    <string name="raw_open_failed">Cannot open the file</string>
+    <string name="raw_sent">File sent to the printer (%1$d bytes)</string>
+    <string name="raw_send_failed">USB send failed (is the printer connected?)</string>
+    <string name="raw_error">Read/send error: %1$s</string>
+
+    <!-- Log export -->
+    <string name="logs_none">No logs to export</string>
+    <string name="logs_saved">Logs saved to %1$s</string>
+    <string name="logs_create_failed">Failed to create the file in Downloads</string>
+    <string name="logs_error">Error: %1$s</string>
 </resources>

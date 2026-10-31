@@ -1,0 +1,81 @@
+<resources>
+    <string name="back">Retour</string>
+
+    <!-- File selection -->
+    <string name="file_none">Aucun fichier sélectionné</string>
+    <string name="file_hint">Choisissez une image ou un PDF à imprimer</string>
+    <string name="file_choose">Choisir un fichier</string>
+    <string name="file_printer">Imprimante</string>
+    <string name="file_print">Imprimer</string>
+    <string name="file_change">Changer de fichier</string>
+    <string name="file_selected_image">Image sélectionnée</string>
+    <string name="file_unsupported">Fichier non pris en charge</string>
+
+    <!-- Print screen -->
+    <string name="print_title">Impression</string>
+    <string name="settings_title">Réglages d\'impression</string>
+    <string name="setting_copies">Copies :</string>
+    <string name="setting_orientation">Orientation :</string>
+    <string name="orientation_portrait">Portrait</string>
+    <string name="orientation_landscape">Paysage</string>
+    <string name="setting_color">Couleur :</string>
+    <string name="color_color">Couleur</string>
+    <string name="color_grayscale">Monochrome</string>
+    <string name="setting_quality">Qualité :</string>
+    <string name="quality_draft">Brouillon</string>
+    <string name="quality_normal">Normal</string>
+    <string name="quality_best">Optimal</string>
+    <string name="print_now">Imprimer</string>
+    <string name="queue_title">File d\'impression</string>
+    <string name="queue_empty">Aucune impression récente</string>
+    <string name="job_pending">En attente</string>
+    <string name="job_printing">Impression en cours</string>
+    <string name="job_completed">Terminée</string>
+    <string name="job_error">Erreur</string>
+    <string name="preview_none">Aucun fichier à prévisualiser</string>
+    <string name="preview">Aperçu</string>
+    <string name="preview_unavailable">Aperçu indisponible</string>
+    <string name="page_previous">Page précédente</string>
+    <string name="page_next">Page suivante</string>
+
+    <!-- Printer connection -->
+    <string name="connect_title">Imprimante</string>
+    <string name="refresh">Actualiser</string>
+    <string name="printers_available">Imprimantes disponibles</string>
+    <string name="printers_none">Aucune imprimante trouvée. Branchez une imprimante USB.</string>
+    <string name="printer_unknown">Imprimante inconnue</string>
+    <string name="logs_title">Journal</string>
+    <string name="logs_clear">Effacer</string>
+    <string name="logs_save">Enregistrer</string>
+    <string name="state_disconnected">Déconnectée</string>
+    <string name="state_requesting">Demande d\'autorisation…</string>
+    <string name="state_connected">Connectée : %1$s</string>
+    <string name="state_error">Erreur : %1$s</string>
+    <string name="status_label">État de l\'imprimante :</string>
+    <string name="status_hint">Touchez « Actualiser l\'état » pour le vérifier</string>
+    <string name="status_refresh">Actualiser l\'état</string>
+    <string name="send_test_file">Envoyer un fichier d\'impression (test)</string>
+
+    <!-- Printer status and errors -->
+    <string name="status_not_connected">Non connectée</string>
+    <string name="status_endpoint_missing">Point d\'accès USB manquant</string>
+    <string name="status_ready">Prête</string>
+    <string name="status_online">En ligne</string>
+    <string name="status_no_response">L\'imprimante ne répond pas à la demande d\'état</string>
+    <string name="error_permission_denied">Autorisation refusée</string>
+    <string name="error_no_interface">Aucune interface imprimante</string>
+    <string name="error_claim">Impossible de réserver l\'interface USB</string>
+    <string name="error_open">Impossible d\'ouvrir le périphérique USB</string>
+
+    <!-- Test file sending -->
+    <string name="raw_open_failed">Impossible d\'ouvrir le fichier</string>
+    <string name="raw_sent">Fichier envoyé à l\'imprimante (%1$d octets)</string>
+    <string name="raw_send_failed">Échec de l\'envoi USB (imprimante connectée ?)</string>
+    <string name="raw_error">Erreur de lecture ou d\'envoi : %1$s</string>
+
+    <!-- Log export -->
+    <string name="logs_none">Aucun journal à exporter</string>
+    <string name="logs_saved">Journal enregistré dans %1$s</string>
+    <string name="logs_create_failed">Impossible de créer le fichier dans Téléchargements</string>
+    <string name="logs_error">Erreur : %1$s</string>
+</resources>

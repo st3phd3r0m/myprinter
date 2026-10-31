@@ -16,9 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.myprinter.R
 import com.example.myprinter.ui.viewmodel.PrintJobViewModel
 
 import androidx.compose.ui.tooling.preview.Preview
@@ -42,7 +44,7 @@ fun FileSelectionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("MyPrinter") })
+            TopAppBar(title = { Text(stringResource(R.string.app_name)) })
         }
     ) { innerPadding ->
         Column(
@@ -62,12 +64,12 @@ fun FileSelectionScreen(
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "No file selected",
+                    text = stringResource(R.string.file_none),
                     style = MaterialTheme.typography.titleLarge
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Pick an image or PDF to print",
+                    text = stringResource(R.string.file_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -81,7 +83,7 @@ fun FileSelectionScreen(
                 ) {
                     Icon(Icons.Rounded.UploadFile, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Select File", fontSize = 16.sp)
+                    Text(stringResource(R.string.file_choose), fontSize = 16.sp)
                 }
             } else {
                 PreviewSection(uri = selectedUri!!)
@@ -96,7 +98,7 @@ fun FileSelectionScreen(
                     ) {
                         Icon(Icons.Rounded.Usb, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Printer")
+                        Text(stringResource(R.string.file_printer))
                     }
                     ElevatedButton(
                         onClick = { selectedUri?.let { onNavigateToPrintPreview(it) } },
@@ -109,12 +111,12 @@ fun FileSelectionScreen(
                     ) {
                         Icon(Icons.Rounded.Print, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Print")
+                        Text(stringResource(R.string.file_print))
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 TextButton(onClick = { viewModel.selectFile(null) }) {
-                    Text("Clear Selection")
+                    Text(stringResource(R.string.file_change))
                 }
             }
         }
@@ -153,7 +155,7 @@ fun PreviewSection(uri: Uri) {
             if (isImage) {
                 AsyncImage(
                     model = uri,
-                    contentDescription = "Selected Image",
+                    contentDescription = stringResource(R.string.file_selected_image),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
@@ -171,7 +173,7 @@ fun PreviewSection(uri: Uri) {
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Unsupported file",
+                        text = stringResource(R.string.file_unsupported),
                         style = MaterialTheme.typography.titleMedium
                     )
                 }

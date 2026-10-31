@@ -26,6 +26,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.example.myprinter.R
 import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -68,15 +70,15 @@ fun PrinterConnectionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Connect Printer") },
+                title = { Text(stringResource(R.string.connect_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.scanForPrinters() }) {
-                        Icon(Icons.Rounded.Refresh, contentDescription = "Refresh")
+                        Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
                 }
             )
@@ -98,7 +100,7 @@ fun PrinterConnectionScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
             Text(
-                text = "Available Printers",
+                text = stringResource(R.string.printers_available),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -107,7 +109,7 @@ fun PrinterConnectionScreen(
             
             if (discoveredPrinters.isEmpty()) {
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text("No printers found. Connect a USB printer.")
+                    Text(stringResource(R.string.printers_none))
                 }
             } else {
                 LazyColumn(
@@ -128,7 +130,7 @@ fun PrinterConnectionScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "System Logs",
+                    text = stringResource(R.string.logs_title),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -139,7 +141,7 @@ fun PrinterConnectionScreen(
                     ) {
                         Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Clear", fontSize = 12.sp)
+                        Text(stringResource(R.string.logs_clear), fontSize = 12.sp)
                     }
                     TextButton(
                         onClick = { viewModel.exportLogs() },
@@ -147,7 +149,7 @@ fun PrinterConnectionScreen(
                     ) {
                         Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Save Logs", fontSize = 12.sp)
+                        Text(stringResource(R.string.logs_save), fontSize = 12.sp)
                     }
                 }
             }
@@ -214,11 +216,11 @@ fun ConnectionStatusCard(
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = when (state) {
-                        is PrinterConnectionState.Idle -> "Disconnected"
-                        is PrinterConnectionState.RequestingPermission -> "Requesting Permission..."
-                        is PrinterConnectionState.Connected -> "Connected: ${state.model}"
-                        is PrinterConnectionState.Error -> "Error: ${state.message}"
-                        is PrinterConnectionState.Disconnected -> "Disconnected"
+                        is PrinterConnectionState.Idle -> stringResource(R.string.state_disconnected)
+                        is PrinterConnectionState.RequestingPermission -> stringResource(R.string.state_requesting)
+                        is PrinterConnectionState.Connected -> stringResource(R.string.state_connected, state.model)
+                        is PrinterConnectionState.Error -> stringResource(R.string.state_error, state.message)
+                        is PrinterConnectionState.Disconnected -> stringResource(R.string.state_disconnected)
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
@@ -230,12 +232,12 @@ fun ConnectionStatusCard(
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Printer Status:",
+                    text = stringResource(R.string.status_label),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = status.ifEmpty { "Click refresh to check status" },
+                    text = status.ifEmpty { stringResource(R.string.status_hint) },
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -246,7 +248,7 @@ fun ConnectionStatusCard(
                 ) {
                     Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Refresh Status")
+                    Text(stringResource(R.string.status_refresh))
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
@@ -254,7 +256,7 @@ fun ConnectionStatusCard(
                     modifier = Modifier.align(Alignment.End),
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Text("Envoyer un fichier d'impression (test)")
+                    Text(stringResource(R.string.send_test_file))
                 }
             }
         }
@@ -278,7 +280,7 @@ fun PrinterItem(device: UsbDevice, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
             Column {
                 Text(
-                    text = device.productName ?: "Unknown Printer",
+                    text = device.productName ?: stringResource(R.string.printer_unknown),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold
                 )

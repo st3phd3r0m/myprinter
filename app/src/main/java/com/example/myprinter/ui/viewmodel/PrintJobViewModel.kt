@@ -3,6 +3,7 @@ package com.example.myprinter.ui.viewmodel
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myprinter.usb.PrintOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -19,19 +20,12 @@ data class PrintJob(
     val timestamp: Long = System.currentTimeMillis()
 )
 
-data class PrintSettings(
-    val copies: Int = 1,
-    val orientation: String = "Portrait",
-    val colorMode: String = "Color",
-    val quality: String = "Normal"
-)
-
 class PrintJobViewModel : ViewModel() {
     private val _printJobs = MutableStateFlow<List<PrintJob>>(emptyList())
     val printJobs: StateFlow<List<PrintJob>> = _printJobs.asStateFlow()
 
-    private val _currentSettings = MutableStateFlow(PrintSettings())
-    val currentSettings: StateFlow<PrintSettings> = _currentSettings.asStateFlow()
+    private val _currentSettings = MutableStateFlow(PrintOptions())
+    val currentSettings: StateFlow<PrintOptions> = _currentSettings.asStateFlow()
 
     private val _selectedUri = MutableStateFlow<Uri?>(null)
     val selectedUri: StateFlow<Uri?> = _selectedUri.asStateFlow()
@@ -40,7 +34,7 @@ class PrintJobViewModel : ViewModel() {
         _selectedUri.value = uri
     }
 
-    fun updateSettings(settings: PrintSettings) {
+    fun updateSettings(settings: PrintOptions) {
         _currentSettings.value = settings
     }
 

@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.example.myprinter.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -79,7 +80,7 @@ class UsbPrinterManager(private val context: Context) {
                         device?.let { connectToDevice(it) } ?: usbDevice?.let { connectToDevice(it) }
                     } else {
                         addLog("Permission denied by user")
-                        _connectionState.value = PrinterConnectionState.Error("Permission denied")
+                        _connectionState.value = PrinterConnectionState.Error(context.getString(R.string.error_permission_denied))
                     }
                 }
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED == action) {
@@ -170,7 +171,7 @@ class UsbPrinterManager(private val context: Context) {
 
         if (foundInterface == null) {
             addLog("Error: No Printer Class (7) interface found")
-            _connectionState.value = PrinterConnectionState.Error("No printer interface")
+            _connectionState.value = PrinterConnectionState.Error(context.getString(R.string.error_no_interface))
             return
         }
         usbInterface = foundInterface
@@ -201,11 +202,11 @@ class UsbPrinterManager(private val context: Context) {
                 addLog("Error: Could not claim interface")
                 usbConnection?.close()
                 usbConnection = null
-                _connectionState.value = PrinterConnectionState.Error("Claim failed")
+                _connectionState.value = PrinterConnectionState.Error(context.getString(R.string.error_claim))
             }
         } else {
             addLog("Error: Open device failed")
-            _connectionState.value = PrinterConnectionState.Error("Open failed")
+            _connectionState.value = PrinterConnectionState.Error(context.getString(R.string.error_open))
         }
     }
 
@@ -231,9 +232,9 @@ class UsbPrinterManager(private val context: Context) {
     }
 
     fun checkStatus(): String {
-        val conn = usbConnection ?: return "Not connected"
-        val epIn = endpointIn ?: return "IN ep missing"
-        val epOut = endpointOut ?: return "OUT ep missing"
+        val conn = usbConnection ?: return context.getString(R.string.status_not_connected)
+        val epIn = endpointIn ?: return context.getString(R.string.status_endpoint_missing)
+        val epOut = endpointOut ?: return context.getString(R.string.status_endpoint_missing)
 
         // Try PJL Status
         val pjlQuery = "\u001B%-12345X@PJL INFO STATUS\r\n"
@@ -245,12 +246,12 @@ class UsbPrinterManager(private val context: Context) {
             if (inLen > 0) {
                 val resp = String(buffer, 0, inLen).trim()
                 addLog("Status: $resp")
-                return if (resp.contains("READY", ignoreCase = true)) "Ready" else "Online"
+                return if (resp.contains("READY", ignoreCase = true)) context.getString(R.string.status_ready) else context.getString(R.string.status_online)
             }
         }
         
         addLog("Status check timed out (no PJL status from printer)")
-        return "No status response"
+        return context.getString(R.string.status_no_response)
     }
 
     /** Prints an image or a PDF, rendering and sending one page at a time. */
