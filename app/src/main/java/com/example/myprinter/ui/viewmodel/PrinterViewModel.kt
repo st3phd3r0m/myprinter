@@ -31,6 +31,10 @@ class PrinterViewModel(application: Application) : AndroidViewModel(application)
     private val _sendFileStatus = MutableStateFlow<String?>(null)
     val sendFileStatus: StateFlow<String?> = _sendFileStatus.asStateFlow()
 
+    init {
+        usbPrinterManager.connectToSavedPrinter()
+    }
+
     fun scanForPrinters() {
         _discoveredPrinters.value = usbPrinterManager.discoverPrinters()
     }

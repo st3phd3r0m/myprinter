@@ -42,6 +42,9 @@ class UsbPrinterManager(private val context: Context) {
 
     private val logManager = LogManager(context)
 
+    // The last printer connected to, reconnected automatically (see connectToSavedPrinter).
+    private val prefs = context.getSharedPreferences("printer", Context.MODE_PRIVATE)
+
     private fun addLog(msg: String) {
         Log.d("UsbPrinterManager", msg)
         logManager.log(msg)
@@ -74,6 +77,9 @@ class UsbPrinterManager(private val context: Context) {
                         _connectionState.value = PrinterConnectionState.Error(context.getString(R.string.error_permission_denied))
                     }
                 }
+            } else if (UsbManager.ACTION_USB_DEVICE_ATTACHED == action) {
+                // Without permission, Android's own "open MyPrinter?" prompt handles it (see MainActivity).
+                connectToSavedPrinter(askPermission = false)
             } else if (UsbManager.ACTION_USB_DEVICE_DETACHED == action) {
                 val device: UsbDevice? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
@@ -91,6 +97,7 @@ class UsbPrinterManager(private val context: Context) {
 
     init {
         val filter = IntentFilter(ACTION_USB_PERMISSION)
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
         filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED)
@@ -125,7 +132,31 @@ class UsbPrinterManager(private val context: Context) {
         return false
     }
 
+    /**
+     * Connects to the last printer used, if it is plugged in. Called at startup and when a USB
+     * device is attached; does nothing while a connection or permission request is in progress.
+     * @param askPermission whether to show Android's USB permission dialog if access is not granted yet.
+     */
+    fun connectToSavedPrinter(askPermission: Boolean = true) {
+        if (usbConnection != null || _connectionState.value is PrinterConnectionState.RequestingPermission) return
+        val vendorId = prefs.getInt(KEY_VENDOR_ID, -1)
+        val productId = prefs.getInt(KEY_PRODUCT_ID, -1)
+        if (vendorId == -1) return
+        val device = usbManager.deviceList.values.firstOrNull { it.vendorId == vendorId && it.productId == productId }
+        if (device == null) {
+            addLog("Saved printer not plugged in")
+            return
+        }
+        if (!askPermission && !usbManager.hasPermission(device)) return
+        addLog("Reconnecting to saved printer")
+        requestPermission(device)
+    }
+
     fun requestPermission(device: UsbDevice) {
+        if (usbConnection != null && device == usbDevice) {
+            addLog("Already connected to ${device.deviceName}")
+            return
+        }
         if (usbManager.hasPermission(device)) {
             addLog("Permission already held, connecting...")
             connectToDevice(device)
@@ -187,6 +218,10 @@ class UsbPrinterManager(private val context: Context) {
         if (usbConnection != null) {
             if (usbConnection!!.claimInterface(foundInterface, true)) {
                 addLog("Interface claimed. Connected.")
+                prefs.edit()
+                    .putInt(KEY_VENDOR_ID, device.vendorId)
+                    .putInt(KEY_PRODUCT_ID, device.productId)
+                    .apply()
                 val model = getModelName(device)
                 _connectionState.value = PrinterConnectionState.Connected(device.deviceName, model)
             } else {
@@ -329,6 +364,8 @@ class UsbPrinterManager(private val context: Context) {
     }
 
     private companion object {
+        const val KEY_VENDOR_ID = "vendor_id"
+        const val KEY_PRODUCT_ID = "product_id"
         const val CHUNK_SIZE = 16384
         const val TRANSFER_TIMEOUT_MS = 30000
     }

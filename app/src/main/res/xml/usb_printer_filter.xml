@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Printers this app handles: Android offers to open it (and grants USB access) when one is plugged in. -->
+<resources>
+    <!-- HP Deskjet 1510 (VID 0x03F0, PID 0xC111 / 0xC202) -->
+    <usb-device vendor-id="1008" product-id="49425" />
+    <usb-device vendor-id="1008" product-id="49666" />
+</resources>
