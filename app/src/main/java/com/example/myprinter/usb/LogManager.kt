@@ -21,12 +21,13 @@ class LogManager(private val context: Context) {
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
 
     /**
-     * Appends a message to the internal log file.
+     * Appends a message to the internal log file, which starts over once it exceeds [MAX_LOG_BYTES].
      */
     fun log(message: String) {
         val timestamp = dateFormat.format(Date())
         val logEntry = "[$timestamp] $message\n"
         try {
+            if (logFile.length() > MAX_LOG_BYTES) logFile.delete()
             FileOutputStream(logFile, true).use { output ->
                 output.write(logEntry.toByteArray())
             }
@@ -79,7 +80,7 @@ class LogManager(private val context: Context) {
         }
     }
 
-    fun clearLogs() {
-        if (logFile.exists()) logFile.delete()
+    private companion object {
+        const val MAX_LOG_BYTES = 512 * 1024L
     }
 }

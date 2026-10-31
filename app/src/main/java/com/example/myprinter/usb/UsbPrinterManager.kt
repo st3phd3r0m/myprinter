@@ -32,9 +32,6 @@ class UsbPrinterManager(private val context: Context) {
     private val _connectionState = MutableStateFlow<PrinterConnectionState>(PrinterConnectionState.Idle)
     val connectionState: StateFlow<PrinterConnectionState> = _connectionState.asStateFlow()
 
-    private val _debugLogs = MutableStateFlow<List<String>>(emptyList())
-    val debugLogs: StateFlow<List<String>> = _debugLogs.asStateFlow()
-
     private var usbDevice: UsbDevice? = null
     private var usbInterface: UsbInterface? = null
     private var usbConnection: UsbDeviceConnection? = null
@@ -48,12 +45,6 @@ class UsbPrinterManager(private val context: Context) {
     private fun addLog(msg: String) {
         Log.d("UsbPrinterManager", msg)
         logManager.log(msg)
-        _debugLogs.value = (listOf(msg) + _debugLogs.value).take(15)
-    }
-
-    fun clearLogs() {
-        _debugLogs.value = emptyList()
-        logManager.clearLogs()
     }
 
     fun exportLogsToDownloads(): String {

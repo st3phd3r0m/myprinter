@@ -13,8 +13,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,7 +37,6 @@ fun PrinterConnectionScreen(
     val connectionState by viewModel.connectionState.collectAsState()
     val discoveredPrinters by viewModel.discoveredPrinters.collectAsState()
     val printerStatus by viewModel.printerStatus.collectAsState()
-    val debugLogs by viewModel.debugLogs.collectAsState()
     val exportStatus by viewModel.exportStatus.collectAsState()
     val sendFileStatus by viewModel.sendFileStatus.collectAsState()
     val context = LocalContext.current
@@ -80,6 +77,10 @@ fun PrinterConnectionScreen(
                     IconButton(onClick = { viewModel.scanForPrinters() }) {
                         Icon(Icons.Rounded.Refresh, contentDescription = stringResource(R.string.refresh))
                     }
+                    // The log file is the only diagnostic available while the phone is on the printer.
+                    IconButton(onClick = { viewModel.exportLogs() }) {
+                        Icon(Icons.Rounded.Save, contentDescription = stringResource(R.string.logs_save))
+                    }
                 }
             )
         }
@@ -118,59 +119,6 @@ fun PrinterConnectionScreen(
                 ) {
                     items(discoveredPrinters) { device ->
                         PrinterItem(device = device, onClick = { viewModel.connectToPrinter(device) })
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.logs_title),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Row {
-                    TextButton(
-                        onClick = { viewModel.clearLogs() },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                    ) {
-                        Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.logs_clear), fontSize = 12.sp)
-                    }
-                    TextButton(
-                        onClick = { viewModel.exportLogs() },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                    ) {
-                        Icon(Icons.Rounded.Save, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.logs_save), fontSize = 12.sp)
-                    }
-                }
-            }
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Black),
-                shape = MaterialTheme.shapes.small
-            ) {
-                LazyColumn(
-                    modifier = Modifier.padding(8.dp),
-                    reverseLayout = false
-                ) {
-                    items(debugLogs) { log ->
-                        Text(
-                            text = "> $log",
-                            color = Color.Green,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp
-                        )
                     }
                 }
             }

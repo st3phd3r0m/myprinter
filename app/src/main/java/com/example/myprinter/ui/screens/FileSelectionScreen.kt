@@ -86,8 +86,9 @@ fun FileSelectionScreen(
                     Text(stringResource(R.string.file_choose), fontSize = 16.sp)
                 }
             } else {
-                PreviewSection(uri = selectedUri!!)
-                Spacer(modifier = Modifier.height(32.dp))
+                // The preview takes all the height left by the buttons below.
+                PreviewSection(uri = selectedUri!!, modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -136,15 +137,13 @@ fun FileSelectionScreenPreview() {
 }
 
 @Composable
-fun PreviewSection(uri: Uri) {
+fun PreviewSection(uri: Uri, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val mimeType = context.contentResolver.getType(uri)
     val isImage = mimeType?.startsWith("image/") == true
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(300.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {

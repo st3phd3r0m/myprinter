@@ -45,8 +45,6 @@
     <string name="printers_available">Available printers</string>
     <string name="printers_none">No printers found. Connect a USB printer.</string>
     <string name="printer_unknown">Unknown printer</string>
-    <string name="logs_title">System logs</string>
-    <string name="logs_clear">Clear</string>
     <string name="logs_save">Save logs</string>
     <string name="state_disconnected">Disconnected</string>
     <string name="state_requesting">Requesting permission…</string>

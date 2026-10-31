@@ -21,7 +21,6 @@ class PrinterViewModel(application: Application) : AndroidViewModel(application)
     private val usbPrinterManager = UsbPrinterManager(application)
     
     val connectionState: StateFlow<PrinterConnectionState> = usbPrinterManager.connectionState
-    val debugLogs: StateFlow<List<String>> = usbPrinterManager.debugLogs
 
     private val _discoveredPrinters = MutableStateFlow<List<UsbDevice>>(emptyList())
     val discoveredPrinters: StateFlow<List<UsbDevice>> = _discoveredPrinters.asStateFlow()
@@ -79,10 +78,6 @@ class PrinterViewModel(application: Application) : AndroidViewModel(application)
 
     private val _exportStatus = MutableStateFlow<String?>(null)
     val exportStatus: StateFlow<String?> = _exportStatus.asStateFlow()
-
-    fun clearLogs() {
-        usbPrinterManager.clearLogs()
-    }
 
     fun exportLogs() {
         _exportStatus.value = usbPrinterManager.exportLogsToDownloads()

@@ -44,8 +44,6 @@
     <string name="printers_available">Imprimantes disponibles</string>
     <string name="printers_none">Aucune imprimante trouvée. Branchez une imprimante USB.</string>
     <string name="printer_unknown">Imprimante inconnue</string>
-    <string name="logs_title">Journal</string>
-    <string name="logs_clear">Effacer</string>
     <string name="logs_save">Enregistrer</string>
     <string name="state_disconnected">Déconnectée</string>
     <string name="state_requesting">Demande d\'autorisation…</string>
