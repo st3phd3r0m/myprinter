@@ -28,6 +28,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -230,8 +231,9 @@ fun PrintSettingsCard(
             }
 
             // Orientation
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.setting_orientation), modifier = Modifier.weight(1f))
+            // Label above the choices: beside them it gets squeezed with large system fonts.
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.setting_orientation))
                 SegmentedButton(
                     options = listOf(false to stringResource(R.string.orientation_portrait), true to stringResource(R.string.orientation_landscape)),
                     selectedOption = settings.landscape,
@@ -240,8 +242,8 @@ fun PrintSettingsCard(
             }
 
             // Color Mode
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.setting_color), modifier = Modifier.weight(1f))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.setting_color))
                 SegmentedButton(
                     options = listOf(false to stringResource(R.string.color_color), true to stringResource(R.string.color_grayscale)),
                     selectedOption = settings.grayscale,
@@ -250,8 +252,8 @@ fun PrintSettingsCard(
             }
 
             // Print quality
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.setting_quality), modifier = Modifier.weight(1f))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.setting_quality))
                 SegmentedButton(
                     options = listOf(
                         PrintQuality.Draft to stringResource(R.string.quality_draft),
@@ -273,8 +275,13 @@ fun <T> SegmentedButton(
     selectedOption: T,
     onOptionSelected: (T) -> Unit
 ) {
+    // Options share the full width in proportion to their labels, so they fit even with large system fonts.
     Row(
-        modifier = Modifier.background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small).padding(2.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .background(MaterialTheme.colorScheme.surface, MaterialTheme.shapes.small)
+            .padding(2.dp)
     ) {
         options.forEach { (option, label) ->
             val isSelected = option == selectedOption
@@ -283,10 +290,15 @@ fun <T> SegmentedButton(
                 color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                 contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                 shape = MaterialTheme.shapes.small,
-                modifier = Modifier.height(32.dp).padding(horizontal = 4.dp)
+                modifier = Modifier.weight(label.length.coerceAtLeast(1).toFloat()).fillMaxHeight().heightIn(min = 32.dp).padding(horizontal = 2.dp)
             ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
-                    Text(label, style = MaterialTheme.typography.labelMedium)
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 4.dp)) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
