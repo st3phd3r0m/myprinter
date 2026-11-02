@@ -11,6 +11,8 @@ import androidx.navigation3.ui.NavDisplay
 import com.example.myprinter.ui.screens.FileSelectionScreen
 import com.example.myprinter.ui.screens.PrinterConnectionScreen
 import com.example.myprinter.ui.screens.PrintPreviewScreen
+import com.example.myprinter.ui.screens.ScanScreen
+import com.example.myprinter.ui.viewmodel.ScanViewModel
 import kotlinx.serialization.Serializable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myprinter.ui.viewmodel.PrinterViewModel
@@ -24,6 +26,8 @@ sealed interface Route : NavKey {
     data object PrinterConnection : Route
     @Serializable
     data object PrintPreview : Route
+    @Serializable
+    data object Scan : Route
 }
 
 @Composable
@@ -31,6 +35,7 @@ fun AppNavigation() {
     val backStack = rememberNavBackStack(Route.FileSelection)
     val printerViewModel: PrinterViewModel = viewModel()
     val printJobViewModel: PrintJobViewModel = viewModel()
+    val scanViewModel: ScanViewModel = viewModel()
 
     // A file shared from another app goes straight to the print screen, on top of the file screen.
     val openPrintScreen by printJobViewModel.openPrintScreen.collectAsState()
@@ -52,6 +57,7 @@ fun AppNavigation() {
                         FileSelectionScreen(
                             viewModel = printJobViewModel,
                             onNavigateToPrinter = { backStack.add(Route.PrinterConnection) },
+                            onNavigateToScan = { backStack.add(Route.Scan) },
                             onNavigateToPrintPreview = { uri ->
                                 printJobViewModel.selectFile(uri)
                                 backStack.add(Route.PrintPreview)
@@ -73,6 +79,19 @@ fun AppNavigation() {
                             viewModel = printJobViewModel,
                             printerViewModel = printerViewModel,
                             onBack = { backStack.removeLastOrNull() }
+                        )
+                    }
+                }
+                is Route.Scan -> {
+                    NavEntry(key) {
+                        ScanScreen(
+                            viewModel = scanViewModel,
+                            onBack = { backStack.removeLastOrNull() },
+                            onNavigateToPrinter = { backStack.add(Route.PrinterConnection) },
+                            onPrint = { uri ->
+                                printJobViewModel.selectFile(uri)
+                                backStack.add(Route.PrintPreview)
+                            }
                         )
                     }
                 }

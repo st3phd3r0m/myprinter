@@ -16,12 +16,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.BufferedOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.io.OutputStream
 
 sealed class PrinterConnectionState {
     data object Idle : PrinterConnectionState()
     data object RequestingPermission : PrinterConnectionState()
-    data class Connected(val deviceName: String, val model: String) : PrinterConnectionState()
+    /** [canScan]: the device also has a scanner interface (see [UsbPrinterManager.scan]). */
+    data class Connected(val deviceName: String, val model: String, val canScan: Boolean) : PrinterConnectionState()
     data class Error(val message: String) : PrinterConnectionState()
     data object Disconnected : PrinterConnectionState()
 }
@@ -37,6 +39,9 @@ class UsbPrinterManager(private val context: Context) {
     private var usbConnection: UsbDeviceConnection? = null
     private var endpointIn: UsbEndpoint? = null
     private var endpointOut: UsbEndpoint? = null
+    // Claimed only while scanning.
+    private var scanInterface: UsbInterface? = null
+    private val scanLock = Any()
 
     private val ACTION_USB_PERMISSION = "com.example.myprinter.USB_PERMISSION"
 
@@ -197,15 +202,21 @@ class UsbPrinterManager(private val context: Context) {
         addLog("Connecting to ${device.deviceName} (VID: 0x${String.format("%04X", device.vendorId)})")
         usbDevice = device
         
-        var foundInterface: UsbInterface? = null
-        for (i in 0 until device.interfaceCount) {
-            val iface = device.getInterface(i)
-            if (iface.interfaceClass == UsbConstants.USB_CLASS_PRINTER) {
-                foundInterface = iface
-                addLog("Printer Interface found at index $i")
-                break
-            }
+        val interfaces = (0 until device.interfaceCount).map { device.getInterface(it) }
+        interfaces.forEach {
+            addLog("Interface ${it.id} alt ${it.alternateSetting}: class ${it.interfaceClass}/${it.interfaceSubclass}/${it.interfaceProtocol}")
         }
+        // An IPP-over-USB interface (protocol 4) takes HTTP, not printer data: kept for scanning.
+        val printerInterfaces = interfaces.filter { it.interfaceClass == UsbConstants.USB_CLASS_PRINTER }
+        val foundInterface = printerInterfaces.firstOrNull { it.interfaceProtocol != PROTOCOL_IPP_USB }
+            ?: printerInterfaces.firstOrNull()
+        // HP's scan interface (LEDM, or eSCL on newer models), else a second IPP-over-USB one.
+        scanInterface = interfaces.firstOrNull {
+            it.interfaceClass == UsbConstants.USB_CLASS_VENDOR_SPEC && it.interfaceSubclass == 0xCC && it.interfaceProtocol == 0
+        } ?: interfaces.firstOrNull {
+            it.interfaceClass == UsbConstants.USB_CLASS_PRINTER && it.interfaceProtocol == PROTOCOL_IPP_USB && it.id != foundInterface?.id
+        }
+        scanInterface?.let { addLog("Scanner interface: ${it.id} alt ${it.alternateSetting}") }
 
         if (foundInterface == null) {
             addLog("Error: No Printer Class (7) interface found")
@@ -239,7 +250,7 @@ class UsbPrinterManager(private val context: Context) {
                     .putInt(KEY_PRODUCT_ID, device.productId)
                     .apply()
                 val model = getModelName(device)
-                _connectionState.value = PrinterConnectionState.Connected(device.deviceName, model)
+                _connectionState.value = PrinterConnectionState.Connected(device.deviceName, model, canScan = scanInterface != null)
             } else {
                 addLog("Error: Could not claim interface")
                 usbConnection?.close()
@@ -333,6 +344,41 @@ class UsbPrinterManager(private val context: Context) {
     /** Sends ready-made printer data (e.g. a PCL file produced by hpcups on a PC) as is. */
     fun printRaw(data: ByteArray): Boolean = send { it.write(data) }
 
+    /**
+     * Scans one page from the flatbed and returns it as JPEG.
+     * @throws ScanException, or [IOException] if the USB transfer fails.
+     */
+    fun scan(options: ScanOptions): ByteArray = synchronized(scanLock) {
+        val conn = usbConnection ?: throw ScanException(ScanException.Reason.Failed, "No printer connected")
+        val iface = scanInterface ?: throw ScanException(ScanException.Reason.Failed, "No scanner interface")
+        var epIn: UsbEndpoint? = null
+        var epOut: UsbEndpoint? = null
+        for (i in 0 until iface.endpointCount) {
+            val ep = iface.getEndpoint(i)
+            if (ep.type != UsbConstants.USB_ENDPOINT_XFER_BULK) continue
+            if (ep.direction == UsbConstants.USB_DIR_IN) epIn = ep else epOut = ep
+        }
+        if (epIn == null || epOut == null) throw ScanException(ScanException.Reason.Failed, "Scanner endpoints missing")
+        if (!conn.claimInterface(iface, true)) throw ScanException(ScanException.Reason.Failed, "Cannot claim scanner interface")
+        try {
+            if (iface.alternateSetting != 0) conn.setInterface(iface)
+            val http = HttpChannel(UsbBulkInputStream(conn, epIn), UsbBulkOutputStream(conn, epOut))
+            val protocol = ScanProtocol.detect(http)
+                ?: throw ScanException(ScanException.Reason.Failed, "Unknown scanner protocol")
+            addLog("Scanning with $protocol, $options")
+            val jpeg = Jpeg.withKnownHeight(protocol.scanPage(http, options))
+            addLog("Scanned ${jpeg.size} bytes")
+            jpeg
+        } catch (e: IOException) {
+            addLog("Scan failed: ${e.message}")
+            throw e
+        } finally {
+            conn.releaseInterface(iface)
+            // An alternate setting of the printer's own interface: give it back to printing.
+            usbInterface?.takeIf { it.id == iface.id }?.let { conn.setInterface(it) }
+        }
+    }
+
     private fun send(write: (OutputStream) -> Unit): Boolean {
         val conn = usbConnection ?: return false
         val epOut = endpointOut ?: return false
@@ -370,6 +416,50 @@ class UsbPrinterManager(private val context: Context) {
         }
     }
 
+    /**
+     * Reads what the device sends, waiting up to [READ_DEADLINE_MS]: a scanner answers only once
+     * its head has moved. Always reads whole USB buffers, so a packet never overflows the request.
+     */
+    private class UsbBulkInputStream(
+        private val conn: UsbDeviceConnection,
+        private val endpoint: UsbEndpoint
+    ) : InputStream() {
+        private val buffer = ByteArray(CHUNK_SIZE)
+        private var start = 0
+        private var end = 0
+
+        override fun read(): Int {
+            if (!fill()) return -1
+            return buffer[start++].toInt() and 0xFF
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (len == 0) return 0
+            if (!fill()) return -1
+            val n = minOf(len, end - start)
+            System.arraycopy(buffer, start, b, off, n)
+            start += n
+            return n
+        }
+
+        private fun fill(): Boolean {
+            if (start < end) return true
+            val deadline = System.currentTimeMillis() + READ_DEADLINE_MS
+            while (true) {
+                val began = System.currentTimeMillis()
+                val n = conn.bulkTransfer(endpoint, buffer, buffer.size, TRANSFER_TIMEOUT_MS)
+                if (n > 0) {
+                    start = 0
+                    end = n
+                    return true
+                }
+                // -1 comes for a timeout as for an error: only a quick one is an error.
+                if (n < 0 && System.currentTimeMillis() - began < 1000) throw IOException("USB read failed")
+                if (System.currentTimeMillis() > deadline) throw IOException("No answer from the scanner")
+            }
+        }
+    }
+
     fun disconnect() {
         addLog("Disconnecting...")
         usbConnection?.apply {
@@ -378,6 +468,7 @@ class UsbPrinterManager(private val context: Context) {
         }
         usbConnection = null
         usbInterface = null
+        scanInterface = null
         usbDevice = null
         endpointIn = null
         endpointOut = null
@@ -390,5 +481,7 @@ class UsbPrinterManager(private val context: Context) {
         const val KEY_PRODUCT_ID = "product_id"
         const val CHUNK_SIZE = 16384
         const val TRANSFER_TIMEOUT_MS = 30000
+        const val READ_DEADLINE_MS = 120_000L
+        const val PROTOCOL_IPP_USB = 4
     }
 }

@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.DocumentScanner
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.Print
 import androidx.compose.material.icons.rounded.Usb
@@ -31,6 +32,7 @@ import com.example.myprinter.ui.theme.MyPrinterTheme
 fun FileSelectionScreen(
     viewModel: PrintJobViewModel,
     onNavigateToPrinter: () -> Unit,
+    onNavigateToScan: () -> Unit,
     onNavigateToPrintPreview: (Uri) -> Unit
 ) {
     val selectedUri by viewModel.selectedUri.collectAsState()
@@ -44,7 +46,14 @@ fun FileSelectionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.app_name)) })
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
+                actions = {
+                    IconButton(onClick = onNavigateToScan) {
+                        Icon(Icons.Rounded.DocumentScanner, contentDescription = stringResource(R.string.scan_open))
+                    }
+                }
+            )
         }
     ) { innerPadding ->
         Column(
@@ -84,6 +93,16 @@ fun FileSelectionScreen(
                     Icon(Icons.Rounded.UploadFile, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(stringResource(R.string.file_choose), fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedButton(
+                    onClick = onNavigateToScan,
+                    modifier = Modifier.height(56.dp).padding(horizontal = 32.dp),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Icon(Icons.Rounded.DocumentScanner, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(stringResource(R.string.scan_open), fontSize = 16.sp)
                 }
             } else {
                 // The preview takes all the height left by the buttons below.
@@ -131,6 +150,7 @@ fun FileSelectionScreenPreview() {
         FileSelectionScreen(
             viewModel = PrintJobViewModel(),
             onNavigateToPrinter = {},
+            onNavigateToScan = {},
             onNavigateToPrintPreview = {}
         )
     }

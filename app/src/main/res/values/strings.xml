@@ -89,4 +89,30 @@
     <string name="print_service_printer_name">HP Deskjet 1510 (USB)</string>
     <string name="print_service_not_connected">Printer not connected: plug it in and open MyPrinter</string>
     <string name="print_service_failed">Printing failed</string>
+
+    <!-- Scanning -->
+    <string name="scan_title">Scan</string>
+    <string name="scan_open">Scan a document</string>
+    <string name="scan_not_connected">No scanner connected: plug in a multifunction printer or a scanner.</string>
+    <string name="scan_unsupported">This printer has no scanner this app can use.</string>
+    <string name="scan_gray">Grayscale</string>
+    <string name="scan_resolution">Resolution:</string>
+    <string name="scan_dpi">%1$d dpi</string>
+    <string name="scan_page">Scan</string>
+    <string name="scan_add_page">Scan another page</string>
+    <string name="scan_in_progress">Scanning…</string>
+    <string name="scan_hint">Place the document face down on the glass</string>
+    <plurals name="scan_pages">
+        <item quantity="one">%1$d page</item>
+        <item quantity="other">%1$d pages</item>
+    </plurals>
+    <string name="scan_page_number">Page %1$d</string>
+    <string name="scan_delete_page">Delete page</string>
+    <string name="scan_save">Save</string>
+    <string name="scan_share">Share</string>
+    <string name="scan_saved">PDF saved</string>
+    <string name="scan_save_failed">Could not save the PDF</string>
+    <string name="scan_error_busy">The scanner is busy, try again in a moment</string>
+    <string name="scan_error_no_document">No document on the glass</string>
+    <string name="scan_error_failed">Scan failed</string>
 </resources>
