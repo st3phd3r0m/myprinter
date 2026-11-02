@@ -2,6 +2,7 @@ package com.example.myprinter.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,7 +27,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** The pages scanned so far, kept as JPEG files in the cache until saved, shared or printed as a PDF. */
+/** How the pages are saved and shared: one PDF, or one JPEG per page. Printing always uses the PDF. */
+enum class ScanFormat { Pdf, Jpeg }
+
+/** The pages scanned so far, kept as JPEG files in the cache until saved, shared or printed. */
 class ScanViewModel(application: Application) : AndroidViewModel(application) {
     private val printerManager = (application as MyPrinterApplication).printerManager
 
@@ -45,6 +49,9 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
     private val _options = MutableStateFlow(ScanOptions())
     val options: StateFlow<ScanOptions> = _options.asStateFlow()
 
+    private val _format = MutableStateFlow(ScanFormat.Pdf)
+    val format: StateFlow<ScanFormat> = _format.asStateFlow()
+
     private val _scanning = MutableStateFlow(false)
     val scanning: StateFlow<Boolean> = _scanning.asStateFlow()
 
@@ -53,6 +60,10 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateOptions(options: ScanOptions) {
         _options.value = options
+    }
+
+    fun updateFormat(format: ScanFormat) {
+        _format.value = format
     }
 
     fun scanPage() {
@@ -93,7 +104,7 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         val app = getApplication<Application>()
         dir.listFiles { file -> file.extension == "pdf" }?.forEach { it.delete() }
         // The name shows in the app the PDF is shared to.
-        val pdf = File(dir, defaultPdfName())
+        val pdf = File(dir, "${defaultName()}.pdf")
         pdf.outputStream().buffered().use { JpegPdf.write(it, _pages.value) }
         FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", pdf)
     }
@@ -113,8 +124,43 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun defaultPdfName(): String =
-        "Scan_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())}.pdf"
+    /** The page images, for sharing. */
+    fun jpegUris(): List<Uri> {
+        val app = getApplication<Application>()
+        return _pages.value.map { FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", it.file) }
+    }
+
+    /** Writes one JPEG per page into [tree], a folder the user picked through the system file picker. */
+    fun saveJpegs(tree: Uri) {
+        val app = getApplication<Application>()
+        val pages = _pages.value
+        viewModelScope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                try {
+                    val resolver = app.contentResolver
+                    val folder = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+                    val baseName = defaultName()
+                    pages.forEachIndexed { index, page ->
+                        val name = if (pages.size == 1) baseName else "${baseName}_${index + 1}"
+                        val target = DocumentsContract.createDocument(resolver, folder, "image/jpeg", name)
+                            ?: throw IOException("Cannot create $name")
+                        resolver.openOutputStream(target)?.use { out -> page.file.inputStream().use { it.copyTo(out) } }
+                            ?: throw IOException("Cannot write $name")
+                    }
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            }
+            showMessage(
+                if (saved) app.resources.getQuantityString(R.plurals.scan_jpeg_saved, pages.size, pages.size)
+                else app.getString(R.string.scan_save_failed)
+            )
+        }
+    }
+
+    /** File name without extension for what is saved or shared now. */
+    fun defaultName(): String = "Scan_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())}"
 
     private fun showMessage(text: String) {
         _message.value = text

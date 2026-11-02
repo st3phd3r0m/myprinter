@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.myprinter.R
+import com.example.myprinter.ui.viewmodel.ScanFormat
 import com.example.myprinter.ui.viewmodel.ScanViewModel
 import com.example.myprinter.usb.PrinterConnectionState
 import com.example.myprinter.usb.ScanColor
@@ -40,6 +41,7 @@ fun ScanScreen(
     val connectionState by viewModel.connectionState.collectAsState()
     val pages by viewModel.pages.collectAsState()
     val options by viewModel.options.collectAsState()
+    val format by viewModel.format.collectAsState()
     val scanning by viewModel.scanning.collectAsState()
     val message by viewModel.message.collectAsState()
     val context = LocalContext.current
@@ -54,6 +56,12 @@ fun ScanScreen(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri ->
         uri?.let { viewModel.savePdf(it) }
+    }
+    // JPEG: one file per page, so the user picks a folder.
+    val folderLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let { viewModel.saveJpegs(it) }
     }
 
     Scaffold(
@@ -120,6 +128,17 @@ fun ScanScreen(
                             onOptionSelected = { viewModel.updateOptions(options.copy(dpi = it)) }
                         )
                     }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.scan_format))
+                        SegmentedButton(
+                            options = listOf(
+                                ScanFormat.Pdf to stringResource(R.string.scan_format_pdf),
+                                ScanFormat.Jpeg to stringResource(R.string.scan_format_jpeg)
+                            ),
+                            selectedOption = format,
+                            onOptionSelected = { viewModel.updateFormat(it) }
+                        )
+                    }
                 }
             }
 
@@ -183,7 +202,12 @@ fun ScanScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = { saveLauncher.launch(viewModel.defaultPdfName()) },
+                        onClick = {
+                            when (format) {
+                                ScanFormat.Pdf -> saveLauncher.launch("${viewModel.defaultName()}.pdf")
+                                ScanFormat.Jpeg -> folderLauncher.launch(null)
+                            }
+                        },
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
@@ -194,12 +218,17 @@ fun ScanScreen(
                     OutlinedButton(
                         onClick = {
                             scope.launch {
-                                val uri = viewModel.pdfUri()
-                                val send = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/pdf"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                val send = when (format) {
+                                    ScanFormat.Pdf -> Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/pdf"
+                                        putExtra(Intent.EXTRA_STREAM, viewModel.pdfUri())
+                                    }
+                                    ScanFormat.Jpeg -> Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                                        type = "image/jpeg"
+                                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(viewModel.jpegUris()))
+                                    }
                                 }
+                                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 context.startActivity(Intent.createChooser(send, null))
                             }
                         },

@@ -110,6 +110,13 @@
     <string name="scan_share">Partager</string>
     <string name="scan_saved">PDF enregistré</string>
     <string name="scan_save_failed">Impossible d\'enregistrer le PDF</string>
+    <string name="scan_format">Format :</string>
+    <string name="scan_format_pdf">PDF</string>
+    <string name="scan_format_jpeg">JPEG</string>
+    <plurals name="scan_jpeg_saved">
+        <item quantity="one">%1$d image enregistrée</item>
+        <item quantity="other">%1$d images enregistrées</item>
+    </plurals>
     <string name="scan_error_busy">Le scanner est occupé, réessayez dans un instant</string>
     <string name="scan_error_no_document">Aucun document sur la vitre</string>
     <string name="scan_error_failed">Échec de la numérisation</string>
