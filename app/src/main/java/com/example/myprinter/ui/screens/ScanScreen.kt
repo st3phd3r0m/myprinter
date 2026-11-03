@@ -145,7 +145,7 @@ fun ScanScreen(
             ElevatedButton(
                 onClick = { viewModel.scanPage() },
                 enabled = canScan && !scanning,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
                 shape = MaterialTheme.shapes.large,
                 colors = ButtonDefaults.elevatedButtonColors(
                     containerColor = MaterialTheme.colorScheme.primary,

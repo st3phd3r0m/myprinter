@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -80,14 +81,15 @@ fun FileSelectionScreen(
                 Text(
                     text = stringResource(R.string.file_hint),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(32.dp))
                 ElevatedButton(
                     onClick = {
                         launcher.launch(arrayOf("image/*", "application/pdf"))
                     },
-                    modifier = Modifier.height(56.dp).padding(horizontal = 32.dp),
+                    modifier = Modifier.heightIn(min = 56.dp).padding(horizontal = 32.dp),
                     shape = MaterialTheme.shapes.large
                 ) {
                     Icon(Icons.Rounded.UploadFile, contentDescription = null)
@@ -97,7 +99,7 @@ fun FileSelectionScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 OutlinedButton(
                     onClick = onNavigateToScan,
-                    modifier = Modifier.height(56.dp).padding(horizontal = 32.dp),
+                    modifier = Modifier.heightIn(min = 56.dp).padding(horizontal = 32.dp),
                     shape = MaterialTheme.shapes.large
                 ) {
                     Icon(Icons.Rounded.DocumentScanner, contentDescription = null)
@@ -113,7 +115,7 @@ fun FileSelectionScreen(
                 ) {
                     OutlinedButton(
                         onClick = onNavigateToPrinter,
-                        modifier = Modifier.weight(1f).height(56.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 56.dp),
                         shape = MaterialTheme.shapes.large
                     ) {
                         Icon(Icons.Rounded.Usb, contentDescription = null)
@@ -122,7 +124,7 @@ fun FileSelectionScreen(
                     }
                     ElevatedButton(
                         onClick = { selectedUri?.let { onNavigateToPrintPreview(it) } },
-                        modifier = Modifier.weight(1f).height(56.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 56.dp),
                         shape = MaterialTheme.shapes.large,
                         colors = ButtonDefaults.elevatedButtonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
