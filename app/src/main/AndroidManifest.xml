@@ -7,6 +7,13 @@
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
+    <!-- From Android 11, needed to see whether a speech recognizer is installed (file name dictation). -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+
     <application
         android:name=".MyPrinterApplication"
         android:allowBackup="true"

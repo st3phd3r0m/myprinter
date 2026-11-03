@@ -110,7 +110,7 @@
     <string name="scan_delete_page">Delete page</string>
     <string name="scan_save">Save</string>
     <string name="scan_share">Share</string>
-    <string name="scan_pdf_saved">PDF saved in %1$s</string>
+    <string name="scan_pdf_saved">%1$s saved in %2$s</string>
     <string name="scan_save_failed">Could not save</string>
     <string name="scan_permission_denied">Saving needs access to the phone\'s storage</string>
     <string name="scan_format">Format:</string>
@@ -120,6 +120,10 @@
         <item quantity="one">%1$d image saved in %2$s</item>
         <item quantity="other">%1$d images saved in %2$s</item>
     </plurals>
+    <string name="scan_dictate_question">Would you like to dictate the file name?</string>
+    <string name="scan_dictate">Dictate</string>
+    <string name="scan_dictate_no">No</string>
+    <string name="scan_dictate_prompt">File name</string>
     <string name="scan_error_busy">The scanner is busy, try again in a moment</string>
     <string name="scan_error_no_document">No document on the glass</string>
     <string name="scan_error_failed">Scan failed</string>

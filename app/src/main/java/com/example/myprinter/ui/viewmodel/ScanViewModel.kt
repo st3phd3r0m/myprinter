@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.myprinter.MyPrinterApplication
 import com.example.myprinter.R
 import com.example.myprinter.storage.ScanStorage
+import com.example.myprinter.storage.freeName
 import com.example.myprinter.usb.JpegPdf
 import com.example.myprinter.usb.PrinterConnectionState
 import com.example.myprinter.usb.ScanException
@@ -99,53 +100,68 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         _pages.update { it - page }
     }
 
-    /** The pages as one PDF, for sharing or printing. */
-    suspend fun pdfUri(): Uri = withContext(Dispatchers.IO) {
-        val app = getApplication<Application>()
-        dir.listFiles { file -> file.extension == "pdf" }?.forEach { it.delete() }
-        // The name shows in the app the PDF is shared to.
-        val pdf = File(dir, "${defaultName()}.pdf")
-        pdf.outputStream().buffered().use { JpegPdf.write(it, _pages.value) }
-        FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", pdf)
-    }
+    /** The pages as one PDF, for sharing or printing; [dictated] is the file name the user said, if any. */
+    suspend fun pdfUri(dictated: String? = null): Uri = sharedFiles(outputFiles(ScanFormat.Pdf, dictated, _pages.value)).single()
 
     /** The page images, for sharing. */
-    fun jpegUris(): List<Uri> {
+    suspend fun jpegUris(dictated: String?): List<Uri> = sharedFiles(outputFiles(ScanFormat.Jpeg, dictated, _pages.value))
+
+    /** Writes [files] to the cache folder shared through the FileProvider, replacing the previous ones. */
+    private suspend fun sharedFiles(files: List<ScanStorage.OutputFile>): List<Uri> = withContext(Dispatchers.IO) {
         val app = getApplication<Application>()
-        return _pages.value.map { FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", it.file) }
+        val shared = File(dir, "shared")
+        shared.deleteRecursively()
+        shared.mkdirs()
+        files.map { file ->
+            val target = File(shared, freeName(file.baseName, file.extension) { File(shared, it).exists() })
+            target.outputStream().buffered().use(file.write)
+            FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", target)
+        }
     }
 
-    /** Saves the pages in the chosen format to Documents/MyPrinter, or Download/MyPrinter (see [ScanStorage.save]). */
-    fun save() {
+    /**
+     * Without a dictated name: Scan_<date>_<time>. A PDF takes the dictated name followed by the
+     * date and time; JPEGs take it alone, numbered _1, _2... where the name is already taken.
+     */
+    private fun outputFiles(format: ScanFormat, dictated: String?, pages: List<ScannedPage>): List<ScanStorage.OutputFile> =
+        when (format) {
+            ScanFormat.Pdf -> listOf(
+                ScanStorage.OutputFile(dictated?.let { "${it}_${timestamp()}" } ?: defaultName(), "pdf", "application/pdf") {
+                    JpegPdf.write(it, pages)
+                }
+            )
+            ScanFormat.Jpeg -> pages.map { page ->
+                ScanStorage.OutputFile(dictated ?: defaultName(), "jpg", "image/jpeg") { out -> page.file.inputStream().use { it.copyTo(out) } }
+            }
+        }
+
+    /**
+     * Saves the pages in the chosen format to Documents/MyPrinter or Download/MyPrinter
+     * (see [ScanStorage.save]); [dictated] is the file name the user said, if any.
+     */
+    fun save(dictated: String?) {
         val app = getApplication<Application>()
         val pages = _pages.value
         val format = _format.value
-        val name = defaultName()
         viewModelScope.launch {
-            val folder = withContext(Dispatchers.IO) {
+            val saved = withContext(Dispatchers.IO) {
                 try {
-                    val files = when (format) {
-                        ScanFormat.Pdf -> listOf(ScanStorage.OutputFile("$name.pdf", "application/pdf") { JpegPdf.write(it, pages) })
-                        ScanFormat.Jpeg -> pages.mapIndexed { index, page ->
-                            val fileName = if (pages.size == 1) "$name.jpg" else "${name}_${index + 1}.jpg"
-                            ScanStorage.OutputFile(fileName, "image/jpeg") { out -> page.file.inputStream().use { it.copyTo(out) } }
-                        }
-                    }
-                    ScanStorage.folderLabel(ScanStorage.save(app, files))
+                    ScanStorage.save(app, outputFiles(format, dictated, pages))
                 } catch (e: Exception) {
                     null
                 }
             }
             showMessage(when {
-                folder == null -> app.getString(R.string.scan_save_failed)
-                format == ScanFormat.Pdf -> app.getString(R.string.scan_pdf_saved, folder)
-                else -> app.resources.getQuantityString(R.plurals.scan_jpeg_saved, pages.size, pages.size, folder)
+                saved == null -> app.getString(R.string.scan_save_failed)
+                format == ScanFormat.Pdf -> app.getString(R.string.scan_pdf_saved, saved.names.single(), ScanStorage.folderLabel(saved.directory))
+                else -> app.resources.getQuantityString(R.plurals.scan_jpeg_saved, pages.size, pages.size, ScanStorage.folderLabel(saved.directory))
             })
         }
     }
 
-    /** File name without extension for what is saved or shared now. */
-    fun defaultName(): String = "Scan_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())}"
+    private fun defaultName() = "Scan_${timestamp()}"
+
+    private fun timestamp(): String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())
 
     private fun showMessage(text: String) {
         _message.value = text

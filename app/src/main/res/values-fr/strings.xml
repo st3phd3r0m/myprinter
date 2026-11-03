@@ -108,7 +108,7 @@
     <string name="scan_delete_page">Supprimer la page</string>
     <string name="scan_save">Enregistrer</string>
     <string name="scan_share">Partager</string>
-    <string name="scan_pdf_saved">PDF enregistré dans %1$s</string>
+    <string name="scan_pdf_saved">%1$s enregistré dans %2$s</string>
     <string name="scan_save_failed">Impossible d\'enregistrer</string>
     <string name="scan_permission_denied">L\'enregistrement nécessite l\'accès au stockage du téléphone</string>
     <string name="scan_format">Format :</string>
@@ -118,6 +118,10 @@
         <item quantity="one">%1$d image enregistrée dans %2$s</item>
         <item quantity="other">%1$d images enregistrées dans %2$s</item>
     </plurals>
+    <string name="scan_dictate_question">Souhaitez-vous dicter le nom de votre fichier ?</string>
+    <string name="scan_dictate">Dicter</string>
+    <string name="scan_dictate_no">Non</string>
+    <string name="scan_dictate_prompt">Nom du fichier</string>
     <string name="scan_error_busy">Le scanner est occupé, réessayez dans un instant</string>
     <string name="scan_error_no_document">Aucun document sur la vitre</string>
     <string name="scan_error_failed">Échec de la numérisation</string>

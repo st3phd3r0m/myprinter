@@ -1,8 +1,10 @@
 package com.example.myprinter.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
+import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.myprinter.R
 import com.example.myprinter.storage.ScanStorage
+import com.example.myprinter.storage.dictatedFileName
 import com.example.myprinter.ui.viewmodel.ScanFormat
 import com.example.myprinter.ui.viewmodel.ScanViewModel
 import com.example.myprinter.usb.PrinterConnectionState
@@ -54,21 +57,97 @@ fun ScanScreen(
         message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     }
 
+    // Saving and sharing first offer to dictate the file name, through the system's speech
+    // recognizer: it records, so this app needs no microphone permission.
+    val canDictate = remember {
+        context.packageManager.queryIntentActivities(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), 0).isNotEmpty()
+    }
+    var askDictation by remember { mutableStateOf(false) }
+    var namedAction by remember { mutableStateOf<((String?) -> Unit)?>(null) }
+    val dictation = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val action = namedAction
+        namedAction = null
+        // Dictation closed without speaking: nothing is saved or shared.
+        if (result.resultCode != Activity.RESULT_OK || action == null) return@rememberLauncherForActivityResult
+        val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        action(spoken?.let(::dictatedFileName))
+    }
+    val withName: ((String?) -> Unit) -> Unit = { action ->
+        if (canDictate) {
+            namedAction = action
+            askDictation = true
+        } else {
+            action(null)
+        }
+    }
+    if (askDictation) {
+        AlertDialog(
+            onDismissRequest = {
+                askDictation = false
+                namedAction = null
+            },
+            icon = { Icon(Icons.Rounded.Mic, contentDescription = null) },
+            text = { Text(stringResource(R.string.scan_dictate_question)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    askDictation = false
+                    dictation.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_PROMPT, context.getString(R.string.scan_dictate_prompt))
+                    })
+                }) { Text(stringResource(R.string.scan_dictate)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    askDictation = false
+                    namedAction?.invoke(null)
+                    namedAction = null
+                }) { Text(stringResource(R.string.scan_dictate_no)) }
+            }
+        )
+    }
+
     // Below Android 10, writing to the shared Documents or Download folder needs this permission.
+    var saveAwaitingPermission by remember { mutableStateOf<(() -> Unit)?>(null) }
     val storagePermission = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
+        val pendingSave = saveAwaitingPermission
+        saveAwaitingPermission = null
         if (granted) {
-            viewModel.save()
+            pendingSave?.invoke()
         } else {
             Toast.makeText(context, R.string.scan_permission_denied, Toast.LENGTH_LONG).show()
         }
     }
     val save = {
-        if (ScanStorage.needsPermission(context)) {
-            storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        } else {
-            viewModel.save()
+        withName { name ->
+            if (ScanStorage.needsPermission(context)) {
+                saveAwaitingPermission = { viewModel.save(name) }
+                storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            } else {
+                viewModel.save(name)
+            }
+        }
+    }
+    val share = {
+        withName { name ->
+            scope.launch {
+                val send = when (format) {
+                    ScanFormat.Pdf -> Intent(Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(Intent.EXTRA_STREAM, viewModel.pdfUri(name))
+                    }
+                    ScanFormat.Jpeg -> Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                        type = "image/jpeg"
+                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(viewModel.jpegUris(name)))
+                    }
+                }
+                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                context.startActivity(Intent.createChooser(send, null))
+            }
         }
     }
 
@@ -219,22 +298,7 @@ fun ScanScreen(
                         Text(stringResource(R.string.scan_save), maxLines = 1)
                     }
                     OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                val send = when (format) {
-                                    ScanFormat.Pdf -> Intent(Intent.ACTION_SEND).apply {
-                                        type = "application/pdf"
-                                        putExtra(Intent.EXTRA_STREAM, viewModel.pdfUri())
-                                    }
-                                    ScanFormat.Jpeg -> Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                                        type = "image/jpeg"
-                                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(viewModel.jpegUris()))
-                                    }
-                                }
-                                send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                context.startActivity(Intent.createChooser(send, null))
-                            }
-                        },
+                        onClick = share,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
