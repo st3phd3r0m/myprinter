@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.example.myprinter.navigation.AppNavigation
+import com.example.myprinter.storage.ScanStorage
 import com.example.myprinter.ui.theme.MyPrinterTheme
 import com.example.myprinter.ui.viewmodel.PrintJobViewModel
 import com.example.myprinter.ui.viewmodel.PrinterViewModel
@@ -29,7 +30,11 @@ class MainActivity : ComponentActivity() {
             }
         }
         // On recreation (e.g. rotation) the intent was already handled.
-        if (savedInstanceState == null) handleIntent(intent)
+        if (savedInstanceState == null) {
+            handleIntent(intent)
+            // The scans folder is there to find before the first scan.
+            ScanStorage.prepareFolder(this)
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

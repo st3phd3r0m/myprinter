@@ -2,12 +2,12 @@ package com.example.myprinter.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myprinter.MyPrinterApplication
 import com.example.myprinter.R
+import com.example.myprinter.storage.ScanStorage
 import com.example.myprinter.usb.JpegPdf
 import com.example.myprinter.usb.PrinterConnectionState
 import com.example.myprinter.usb.ScanException
@@ -109,53 +109,38 @@ class ScanViewModel(application: Application) : AndroidViewModel(application) {
         FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", pdf)
     }
 
-    /** Writes the PDF to [target], a document the user created through the system file picker. */
-    fun savePdf(target: Uri) {
-        val app = getApplication<Application>()
-        viewModelScope.launch {
-            val saved = withContext(Dispatchers.IO) {
-                try {
-                    app.contentResolver.openOutputStream(target)?.buffered()?.use { JpegPdf.write(it, _pages.value) } != null
-                } catch (e: IOException) {
-                    false
-                }
-            }
-            showMessage(app.getString(if (saved) R.string.scan_saved else R.string.scan_save_failed))
-        }
-    }
-
     /** The page images, for sharing. */
     fun jpegUris(): List<Uri> {
         val app = getApplication<Application>()
         return _pages.value.map { FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", it.file) }
     }
 
-    /** Writes one JPEG per page into [tree], a folder the user picked through the system file picker. */
-    fun saveJpegs(tree: Uri) {
+    /** Saves the pages in the chosen format to Documents/MyPrinter, or Download/MyPrinter (see [ScanStorage.save]). */
+    fun save() {
         val app = getApplication<Application>()
         val pages = _pages.value
+        val format = _format.value
+        val name = defaultName()
         viewModelScope.launch {
-            val saved = withContext(Dispatchers.IO) {
+            val folder = withContext(Dispatchers.IO) {
                 try {
-                    val resolver = app.contentResolver
-                    val folder = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-                    val baseName = defaultName()
-                    pages.forEachIndexed { index, page ->
-                        val name = if (pages.size == 1) baseName else "${baseName}_${index + 1}"
-                        val target = DocumentsContract.createDocument(resolver, folder, "image/jpeg", name)
-                            ?: throw IOException("Cannot create $name")
-                        resolver.openOutputStream(target)?.use { out -> page.file.inputStream().use { it.copyTo(out) } }
-                            ?: throw IOException("Cannot write $name")
+                    val files = when (format) {
+                        ScanFormat.Pdf -> listOf(ScanStorage.OutputFile("$name.pdf", "application/pdf") { JpegPdf.write(it, pages) })
+                        ScanFormat.Jpeg -> pages.mapIndexed { index, page ->
+                            val fileName = if (pages.size == 1) "$name.jpg" else "${name}_${index + 1}.jpg"
+                            ScanStorage.OutputFile(fileName, "image/jpeg") { out -> page.file.inputStream().use { it.copyTo(out) } }
+                        }
                     }
-                    true
+                    ScanStorage.folderLabel(ScanStorage.save(app, files))
                 } catch (e: Exception) {
-                    false
+                    null
                 }
             }
-            showMessage(
-                if (saved) app.resources.getQuantityString(R.plurals.scan_jpeg_saved, pages.size, pages.size)
-                else app.getString(R.string.scan_save_failed)
-            )
+            showMessage(when {
+                folder == null -> app.getString(R.string.scan_save_failed)
+                format == ScanFormat.Pdf -> app.getString(R.string.scan_pdf_saved, folder)
+                else -> app.resources.getQuantityString(R.plurals.scan_jpeg_saved, pages.size, pages.size, folder)
+            })
         }
     }
 

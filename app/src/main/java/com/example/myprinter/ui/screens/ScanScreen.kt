@@ -1,5 +1,6 @@
 package com.example.myprinter.ui.screens
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.myprinter.R
+import com.example.myprinter.storage.ScanStorage
 import com.example.myprinter.ui.viewmodel.ScanFormat
 import com.example.myprinter.ui.viewmodel.ScanViewModel
 import com.example.myprinter.usb.PrinterConnectionState
@@ -52,16 +54,22 @@ fun ScanScreen(
         message?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
     }
 
-    val saveLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/pdf")
-    ) { uri ->
-        uri?.let { viewModel.savePdf(it) }
+    // Below Android 10, writing to the shared Documents or Download folder needs this permission.
+    val storagePermission = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.save()
+        } else {
+            Toast.makeText(context, R.string.scan_permission_denied, Toast.LENGTH_LONG).show()
+        }
     }
-    // JPEG: one file per page, so the user picks a folder.
-    val folderLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        uri?.let { viewModel.saveJpegs(it) }
+    val save = {
+        if (ScanStorage.needsPermission(context)) {
+            storagePermission.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            viewModel.save()
+        }
     }
 
     Scaffold(
@@ -202,12 +210,7 @@ fun ScanScreen(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
-                        onClick = {
-                            when (format) {
-                                ScanFormat.Pdf -> saveLauncher.launch("${viewModel.defaultName()}.pdf")
-                                ScanFormat.Jpeg -> folderLauncher.launch(null)
-                            }
-                        },
+                        onClick = save,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(horizontal = 8.dp)
                     ) {
